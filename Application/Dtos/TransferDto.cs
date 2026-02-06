@@ -1,7 +1,7 @@
 namespace Application.DTOs;
 
 public record TransferDto(
-    int FromAccountId,
+    string FromAccountNumber,
     string ToAccountNumber,
     decimal Amount,
     string? Description);

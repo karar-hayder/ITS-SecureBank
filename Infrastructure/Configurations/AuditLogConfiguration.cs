@@ -19,7 +19,7 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
             .HasMaxLength(50);
 
         builder.Property(a => a.Changes)
-            .HasColumnType("TEXT"); // For SQLite, use TEXT for large payloads
+            .HasColumnType("TEXT");
 
         builder.HasIndex(a => a.EntityName);
         builder.HasIndex(a => a.EntityId);

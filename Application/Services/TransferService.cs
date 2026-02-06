@@ -14,11 +14,10 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
     private readonly ILogger<TransferService> _logger = logger;
     public async Task<ServiceResult<AccountResponseDto>> TransferAsync(TransferDto request, int userId)
     {
-        var fromAccount = await context.Accounts.FindAsync(request.FromAccountId);
+        var fromAccount = await context.Accounts.FirstOrDefaultAsync(a => a.AccountNumber == request.FromAccountNumber);
+        
         if (fromAccount == null)
-        {
             return ServiceResult<AccountResponseDto>.Failure("Source account not found.", 404);
-        }
 
         if (fromAccount.UserId != userId)
         {

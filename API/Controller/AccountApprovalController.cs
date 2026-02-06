@@ -11,7 +11,6 @@ namespace API.Controller;
 [Authorize]
 public class AccountApprovalController(IAccountApprovalService approvalService) : BaseController
 {
-    // User: Request Approval
     [HttpPost("request")]
     public async Task<IActionResult> RequestApproval([FromForm] AccountApprovalRequestDto request)
     {
@@ -26,11 +25,10 @@ public class AccountApprovalController(IAccountApprovalService approvalService) 
         return Ok(new { message = result.Data });
     }
 
-    // Admin: Get Pending Requests
     [HttpGet("admin/pending")]
     public async Task<IActionResult> GetPendingRequests([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        // if (!IsAdmin()) return Forbid("Access denied. Admin only.");
+        if (!IsAdmin()) return Forbid("Access denied. Admin only.");
 
         var result = await approvalService.GetPendingRequestsAsync(page, pageSize);
         
@@ -40,12 +38,11 @@ public class AccountApprovalController(IAccountApprovalService approvalService) 
         return Ok(result.Data);
     }
 
-    // Admin: Approve/Reject
     [HttpPost("admin/decide")]
     public async Task<IActionResult> ApproveOrReject([FromBody] ApproveAccountDto request)
     {
         var adminId = GetUserIdFromClaims();
-        // if (adminId == null || !IsAdmin()) return Forbid("Access denied. Admin only.");
+        if (adminId == null || !IsAdmin()) return Forbid("Access denied. Admin only.");
 
         var result = await approvalService.ApproveOrRejectAccountAsync(request, adminId.Value);
 
@@ -63,10 +60,6 @@ public class AccountApprovalController(IAccountApprovalService approvalService) 
 
     private bool IsAdmin()
     {
-        // Check for role claim. 
-        // Assuming the JWT token generator puts the Role in ClaimTypes.Role
-        // Since the ClaimTypes.Role is standard, we check it.
-        // We'll also cross-verify with enum string name "Admin"
         var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
         return roleClaim == UserRole.Admin.ToString();
     }

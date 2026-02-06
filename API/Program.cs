@@ -78,6 +78,8 @@ builder.Services.AddAuthorization();
 builder.Services.AddHangfire(config => config.UseMemoryStorage());
 builder.Services.AddHangfireServer();
 
+builder.Services.AddHostedService<API.Jobs.AccountInterestJob>();
+
 builder.Services.AddControllers();
 
 var app = builder.Build();

@@ -7,9 +7,10 @@ public class TransferDtoValidator : AbstractValidator<TransferDto>
 {
     public TransferDtoValidator()
     {
-        RuleFor(x => x.FromAccountId)
-            .GreaterThan(0)
-            .WithMessage("Source account ID is required.");
+        RuleFor(x => x.FromAccountNumber)
+            .NotEmpty()
+            .WithMessage("Source account number is required.")
+            .MaximumLength(34);
 
         RuleFor(x => x.ToAccountNumber)
             .NotEmpty()

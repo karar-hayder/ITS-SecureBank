@@ -11,7 +11,8 @@ namespace API.Controller;
 public class TransferController(ITransferService transferService) : BaseController
 {
     [HttpPost]
-    public async Task<IActionResult> Transfer(TransferDto request)
+    [TypeFilter(typeof(API.Filters.IdempotentAttribute))]
+    public async Task<IActionResult> Transfer([FromBody] TransferDto request)
     {
         var userId = GetUserIdFromClaims();
         if (userId == null)
