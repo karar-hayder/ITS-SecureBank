@@ -6,7 +6,7 @@ public class TransferRequest
     public required string ToAccountNumber { get; set; }
     public decimal Amount { get; set; }
     public string? Description { get; set; }
-    public string? ReferenceNumber { get; set; } // For idempotency
+    public string? ReferenceNumber { get; set; }
 }
 
 public class TransferResponse

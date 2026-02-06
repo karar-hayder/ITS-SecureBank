@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
-namespace Infrastructure.Persistence
+namespace Infrastructure
 {
     public class BankDbContext(DbContextOptions options) 
         : IdentityDbContext<User, IdentityRole<int>, int>(options), IBankDbContext

@@ -7,40 +7,56 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Infrastructure.Authentication;
-using static Application.Dtos.AuthDtos;
+using static Application.DTOs.AuthDtos;
 using Application.Interfaces;
+using Application.DTOs;
+using Domain.Enums;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Services
 {
-    public class AuthService(IJwtTokenGenerator jwt, IBankDbContext context) : IAuthService
+    public class AuthService(
+        IJwtTokenGenerator jwt, 
+        IBankDbContext context, 
+        UserManager<User> userManager,
+        IAccountService accountService) : IAuthService
     {
         public async Task<ServiceResult<UserDto>> RegisterAsync(RegisterDto request)
         {
-            if (await context.Users.AnyAsync(u => u.Email == request.Email))
+            var user = new User
             {
-                return ServiceResult<UserDto>.Failure("Email already exists.");
+                UserName = request.Email,
+                Email = request.Email,
+                FullName = request.FullName
+            };
+
+            var result = await userManager.CreateAsync(user, request.Password);
+
+            if (!result.Succeeded)
+            {
+                return ServiceResult<UserDto>.Failure(string.Join(", ", result.Errors.Select(e => e.Description)));
             }
 
-
-            var user = request.Adapt<User>();
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
-
-
-            context.Users.Add(user);
-            await context.SaveChangesAsync(CancellationToken.None);
+            // Requirement 4.1: Automatically provisions a default Checking account
+            await accountService.CreateAccountAsync(new CreateAccountDto(
+                AccountType: AccountType.Checking,
+                UserId: user.Id,
+                Level: AccountLevel.Level1
+            ));
 
             return ServiceResult<UserDto>.SuccessResult(user.Adapt<UserDto>(), "User registered successfully.", 201);
         }
 
         public async Task<ServiceResult<LoginResponseDto>> LoginAsync(LoginDto request)
         {
-            var user = await context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            var user = await userManager.FindByEmailAsync(request.Email);
 
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            if (user == null || !await userManager.CheckPasswordAsync(user, request.Password))
             {
                 return ServiceResult<LoginResponseDto>.Failure("Invalid email or password.", 401);
             }
+
             var token = jwt.GenerateToken(user);
             var refreshToken = new RefreshToken
             {
@@ -49,11 +65,12 @@ namespace Application.Services
                 ExpiresAt = DateTime.UtcNow.AddDays(1),
                 IsRevoked = false
             };
-            context.RefreshTokens.Add(refreshToken);
-            var refreshtoken = refreshToken.Adapt<RefreshTokenDto>();
 
+            context.RefreshTokens.Add(refreshToken);
             await context.SaveChangesAsync(CancellationToken.None);
-            return ServiceResult<LoginResponseDto>.SuccessResult(new LoginResponseDto(token, refreshtoken, user.Adapt<UserDto>()));
+
+            var refreshtokenDto = refreshToken.Adapt<RefreshTokenDto>();
+            return ServiceResult<LoginResponseDto>.SuccessResult(new LoginResponseDto(token, refreshtokenDto, user.Adapt<UserDto>()));
         }
 
         public async Task<ServiceResult<RefreshTokenDto>> RefreshToken(string refreshToken)
@@ -61,15 +78,18 @@ namespace Application.Services
             var storedToken = await context.RefreshTokens
                 .FirstOrDefaultAsync(x => x.Refreshtoken == refreshToken);
 
-            if (storedToken == null ||
-                storedToken.IsRevoked ||
-                storedToken.ExpiresAt < DateTime.UtcNow)
+            if (storedToken == null || storedToken.IsRevoked || storedToken.ExpiresAt < DateTime.UtcNow)
+            {
                 return ServiceResult<RefreshTokenDto>.Failure("Invalid refresh Token.", 401);
+            }
 
-            var user = await context.Users.FindAsync(storedToken.UserId);
+            var user = await userManager.FindByIdAsync(storedToken.UserId.ToString());
 
             if (user == null)
+            {
                 return ServiceResult<RefreshTokenDto>.Failure("User not found.", 404);
+            }
+
             var newAccessToken = jwt.GenerateToken(user);
             var newRefreshToken = new RefreshToken
             {
@@ -80,17 +100,11 @@ namespace Application.Services
             };
 
             storedToken.IsRevoked = true;
-
             context.RefreshTokens.Add(newRefreshToken);
-
             await context.SaveChangesAsync(CancellationToken.None);
 
-            var response = newRefreshToken.Adapt<RefreshTokenDto>()
-            with
-            { Token = newAccessToken };
-            return response != null
-                ? ServiceResult<RefreshTokenDto>.SuccessResult(response)
-                : ServiceResult<RefreshTokenDto>.Failure("Could not refresh token.", 500);
+            var response = newRefreshToken.Adapt<RefreshTokenDto>() with { Token = newAccessToken };
+            return ServiceResult<RefreshTokenDto>.SuccessResult(response);
         }
     }
 }

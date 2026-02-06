@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static Application.Dtos.AuthDtos;
+using static Application.DTOs.AuthDtos;
 
-namespace Application.Validations
+namespace Application.Validators
 {
     public class LoginDtoValidator : AbstractValidator<LoginDto>
     {

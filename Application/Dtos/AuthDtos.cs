@@ -5,14 +5,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Application.Dtos
+namespace Application.DTOs
 {
     public class AuthDtos
     {
-        public record RegisterDto(string FirstName, string LastName, string Email, string Password);
+        public record RegisterDto(string FullName, string Email, string Password);
         public record LoginDto(string Email, string Password);
         public record LoginResponseDto(string Token, RefreshTokenDto RefreshToken, UserDto User);
-        public record RefreshTokenDto(string Token, string Refreshtoken, Guid UserId, DateTime ExpiresAt, bool IsRevoked);
-        public record UserDto(Guid Id, string FirstName, string LastName, string Email);
+        public record RefreshTokenDto(string Token, string Refreshtoken, int UserId, DateTime ExpiresAt, bool IsRevoked);
+        public record UserDto(int Id, string FullName, string Email);
     }
 }

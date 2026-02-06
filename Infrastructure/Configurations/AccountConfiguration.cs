@@ -22,7 +22,7 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .IsRequired();
 
         builder.Property(a => a.RowVersion)
-            .IsRowVersion();
+            .IsConcurrencyToken();
 
         builder.HasOne(a => a.User)
             .WithMany(u => u.Accounts)
