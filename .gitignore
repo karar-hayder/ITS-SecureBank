@@ -58,3 +58,5 @@ nunit-*.xml
 
 *.db
 **/Migrations/
+.vscode/
+.vs/

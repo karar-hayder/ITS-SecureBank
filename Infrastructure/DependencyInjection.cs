@@ -1,5 +1,7 @@
 using Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Infrastructure.Authentication;
+using Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,6 +19,8 @@ namespace Backend.Infrastructure
 
             services.AddScoped<IBankDbContext>(provider => provider.GetRequiredService<BankDbContext>());
 
+            services.AddScoped<IBankDbContext, BankDbContext>();
+            services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
             return services;
         }
     }

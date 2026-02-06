@@ -1,5 +1,6 @@
 using Application.Interfaces;
 using Application.Services;
+
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.Application
@@ -10,6 +11,7 @@ namespace Backend.Application
         {
             services.AddScoped<IAccountService, AccountService>();
             services.AddScoped<ITransferService, TransferService>();
+            services.AddScoped<IAuthService, AuthService>();
             return services;
         }
     }
