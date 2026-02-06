@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Identity;
 public class User : IdentityUser<int>, IAuditableEntity, ISoftDeletableEntity
 {
     public required string FullName { get; set; }
+    public string Email { get; set; } = null!;
+    public string PhoneNumber { get; set; } = null!;
+    public string PasswordHash { get; set; } = null!;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     public int? CreatedBy { get; set; }
