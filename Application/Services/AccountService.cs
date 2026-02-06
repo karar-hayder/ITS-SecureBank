@@ -12,12 +12,13 @@ public class AccountService(IBankDbContext context) : IAccountService
     public async Task<ServiceResult<AccountDto>> CreateAccountAsync(CreateAccountDto request)
     {
         var account = request.Adapt<Account>();
-        // Ensure account number is generated - this should ideally be in a domain service
-        account.AccountNumber = Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper();
-        
+        var countryCode = "GB";
+        var checkDigits = new Random().Next(10, 99);
+        var bankCode = "BANK";
+        var accountIdentifier = new Random().Next(100000, 999999).ToString();
+        account.AccountNumber = $"{countryCode}{checkDigits}{bankCode}{accountIdentifier}";
         context.Accounts.Add(account);
         await context.SaveChangesAsync();
-        
         return ServiceResult<AccountDto>.SuccessResult(account.Adapt<AccountDto>(), "Account created successfully.", 201);
     }
 
@@ -68,4 +69,22 @@ public class AccountService(IBankDbContext context) : IAccountService
             
         return ServiceResult<List<AccountDto>>.SuccessResult(accounts.Adapt<List<AccountDto>>(), "Accounts retrieved successfully.");
     }
+
+    // public async Task<ServiceResult<PaginatedList<TransactionDto>>> GetAccountTransactionsAsync(int accountId, int pageNumber, int pageSize)
+    // {
+    //     var accountExists = await context.Accounts.AnyAsync(a => a.Id == accountId);
+    //     if (!accountExists)
+    //     {
+    //         return ServiceResult<PaginatedList<TransactionDto>>.Failure("Account not found.", 404);
+    //     }
+
+    //     var query = context.Transactions
+    //         .Where(t => t.AccountId == accountId)
+    //         .OrderByDescending(t => t.CreatedAt)
+    //         .ProjectToType<TransactionDto>();
+
+    //     var paginatedTransactions = await PaginatedList<TransactionDto>.CreateAsync(query, pageNumber, pageSize);
+        
+    //     return ServiceResult<PaginatedList<TransactionDto>>.SuccessResult(paginatedTransactions, "Transactions retrieved successfully.");
+    // }
 }
