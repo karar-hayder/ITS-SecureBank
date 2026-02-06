@@ -1,7 +1,7 @@
 ﻿using API.Common;
 using Microsoft.AspNetCore.Mvc;
-using Application.Dtos;
-using static Application.Dtos.AuthDtos;
+using Application.DTOs;
+using static Application.DTOs.AuthDtos;
 using Application.Interfaces;
 namespace API.Controller
 {

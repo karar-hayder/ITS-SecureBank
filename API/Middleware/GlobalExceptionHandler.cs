@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
-namespace RentARide.API.Middleware;
+namespace Backend.API.Middleware;
 
 public class GlobalExceptionHandler : IExceptionHandler
 {

@@ -10,7 +10,8 @@ public class Account : BaseEntity, IAuditableEntity, ISoftDeletableEntity
     public decimal Balance { get; set; } = 0m;
     public int UserId { get; set; }
     public AccountStatus Status { get; set; } = AccountStatus.Pending;
-    public byte[] RowVersion { get; set; } = null!;
+    public AccountLevel Level { get; set; } = AccountLevel.Level1;
+    public byte[] RowVersion { get; set; } = Guid.NewGuid().ToByteArray();
     public virtual User User { get; set; } = null!;
     public virtual ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
 }

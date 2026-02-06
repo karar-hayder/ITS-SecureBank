@@ -18,22 +18,27 @@ namespace Infrastructure.Authentication
         public string GenerateToken(User user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(configuration["JwtSettings:Secret"]);
+            var secret = configuration["JwtSettings:Secret"] ?? throw new InvalidOperationException("JWT Secret not found.");
+            var key = Encoding.ASCII.GetBytes(secret);
 
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.FullName),
+<<<<<<< HEAD
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.UserRole.ToString()),
+=======
+                new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
+>>>>>>> 42431e9c0a973dd3f1c3c04933808cd7fb292fa4
             };
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
                 Expires = DateTime.UtcNow.AddMinutes(30),
-                Issuer = configuration["JwtSettings:Secret"],
-                Audience = configuration["JwtSettings:Secret"],
+                Issuer = configuration["JwtSettings:Issuer"],
+                Audience = configuration["JwtSettings:Audience"],
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
 
