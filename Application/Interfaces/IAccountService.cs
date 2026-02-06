@@ -12,4 +12,5 @@ public interface IAccountService
     Task<ServiceResult<List<AccountResponseDto>>> GetAccountsByUserIdAsync(int userId);
     Task<ServiceResult<AccountResponseDto>> DepositAsync(int accountId, DepositDto request, int userId);
     Task<ServiceResult<AccountResponseDto>> WithdrawAsync(int accountId, WithdrawDto request, int userId);
+    Task<ServiceResult<PaginatedList<TransactionResponseDto>>> GetTransactionsAsync(int accountId, int userId, int pageNumber, int pageSize);
 }

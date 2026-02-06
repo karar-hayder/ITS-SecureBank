@@ -97,4 +97,23 @@ public class AccountController(IAccountService accountService) : BaseController
 
         return int.TryParse(userIdClaim, out var userId) ? userId : null;
     }
+
+    [HttpGet("{id}/transactions")]
+    public async Task<IActionResult> GetTransactions(int id, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    {
+        var userId = GetUserIdFromClaims();
+        if (userId == null)
+        {
+            return Unauthorized("User not authenticated.");
+        }
+
+        var result = await accountService.GetTransactionsAsync(id, userId.Value, page, pageSize);
+        
+        if (!result.Success)
+        {
+            return StatusCode(result.StatusCode, new { message = result.Message });
+        }
+
+        return Ok(result.Data);
+    }
 }

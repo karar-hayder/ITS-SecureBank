@@ -10,6 +10,8 @@ namespace Application.Interfaces
         DbSet<Transaction> Transactions { get; set; }
         DbSet<User> Users { get; set; }
         DbSet<AuditLog> AuditLogs { get; set; }
+        DbSet<AccountApprovalRequest> AccountApprovalRequests { get; set; }
+        Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade Database { get; }
         public Task<int> SaveChangesAsync(
             CancellationToken cancellationToken = default);
     }
