@@ -7,7 +7,6 @@ using Backend.Application;
 using Backend.Infrastructure;
 using System.Text;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
@@ -38,7 +37,9 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-builder.Services.AddExceptionHandler<RentARide.API.Middleware.GlobalExceptionHandler>();
+// DbContext and infrastructure services are registered in the Infrastructure project
+
+builder.Services.AddExceptionHandler<Backend.API.Middleware.GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 builder.Services.AddApplication();
