@@ -4,9 +4,16 @@ public class ServiceResult<T>
 {
     public bool Success { get; set; }
     public T? Data { get; set; }
-    public string? Message { get; set; }
-    public List<string>? Errors { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public int StatusCode { get; set; }
 
-    public static ServiceResult<T> Ok(T data) => new() { Success = true, Data = data };
-    public static ServiceResult<T> Fail(string message, List<string>? errors = null) => new() { Success = false, Message = message, Errors = errors };
+    public static ServiceResult<T> SuccessResult(T data, string message = "Success", int statusCode = 200)
+    {
+        return new ServiceResult<T> { Success = true, Data = data, Message = message, StatusCode = statusCode };
+    }
+
+    public static ServiceResult<T> Failure(string message, int statusCode = 400)
+    {
+        return new ServiceResult<T> { Success = false, Message = message, StatusCode = statusCode };
+    }
 }
