@@ -1,15 +1,17 @@
 ﻿using API.Common;
 using Microsoft.AspNetCore.Mvc;
 using Application.Dtos;
+using static Application.Dtos.AuthDtos;
+using Application.Interfaces;
 namespace API.Controller
 {
     
-    public class AuthController() : BaseController
+    public class AuthController(IAuthService service) : BaseController
     {
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterDto request)
         {
-            var result = await authService.RegisterAsync(request);
+            var result = await service.RegisterAsync(request);
             if (!result.Success) return BadRequest(result.Message);
             return StatusCode(201, result.Data);
         }
@@ -17,7 +19,7 @@ namespace API.Controller
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto request)
         {
-            var result = await authService.LoginAsync(request);
+            var result = await service.LoginAsync(request);
             if (!result.Success) return Unauthorized(result.Message);
             return Ok(result.Data);
         }
@@ -25,7 +27,7 @@ namespace API.Controller
         public async Task<IActionResult> RefreshToken(string refreshToken)
         {
 
-            var result = await authService.RefreshToken(refreshToken);
+            var result = await service.RefreshToken(refreshToken);
 
             return result.Success ? Ok(result.Data) : Unauthorized(result.Message);
         }

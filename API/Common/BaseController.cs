@@ -1,6 +1,10 @@
-﻿namespace API.Common
+﻿using Microsoft.AspNetCore.Mvc;
+
+namespace API.Common
 {
-    public class BaseController
+    [ApiController]
+    [Route("[controller]")]
+    public class BaseController : ControllerBase
     {
     }
 }

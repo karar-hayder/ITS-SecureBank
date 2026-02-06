@@ -8,7 +8,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Infrastructure
+namespace Infrastructure.Persistence
 {
     public class BankDbContext(DbContextOptions options) : DbContext(options), IBankDbContext
     {
