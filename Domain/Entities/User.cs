@@ -1,6 +1,7 @@
 namespace Domain.Entities;
 
 using Domain.Common;
+using Domain.Enums;
 using Microsoft.AspNetCore.Identity;
 
 public class User : IdentityUser<int>, IAuditableEntity, ISoftDeletableEntity
@@ -9,6 +10,7 @@ public class User : IdentityUser<int>, IAuditableEntity, ISoftDeletableEntity
     public string Email { get; set; } = null!;
     public string PhoneNumber { get; set; } = null!;
     public string PasswordHash { get; set; } = null!;
+    public UserRole UserRole { get; set; } = UserRole.User;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     public int? CreatedBy { get; set; }
