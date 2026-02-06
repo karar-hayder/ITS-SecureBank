@@ -21,7 +21,7 @@ public class AccountService(IBankDbContext context) : IAccountService
             AccountType = request.AccountType,
             Level = request.Level,
             UserId = userId,
-            Status = AccountStatus.Active,
+            Status = AccountStatus.Pending,
             Balance = 0m
         };
         
@@ -213,6 +213,29 @@ public class AccountService(IBankDbContext context) : IAccountService
                 "Concurrency conflict. Please try again.", 
                 409);
         }
+    }
+
+    public async Task<ServiceResult<PaginatedList<TransactionResponseDto>>> GetTransactionsAsync(int accountId, int userId, int pageNumber, int pageSize)
+    {
+        var account = await context.Accounts.FindAsync(accountId);
+        if (account == null)
+        {
+            return ServiceResult<PaginatedList<TransactionResponseDto>>.Failure("Account not found.", 404);
+        }
+
+        if (account.UserId != userId)
+        {
+            return ServiceResult<PaginatedList<TransactionResponseDto>>.Failure("Unauthorized access to account.", 403);
+        }
+
+        var query = context.Transactions
+            .Where(t => t.AccountId == accountId)
+            .OrderByDescending(t => t.CreatedAt)
+            .ProjectToType<TransactionResponseDto>();
+
+        var paginatedTransactions = await PaginatedList<TransactionResponseDto>.CreateAsync(query, pageNumber, pageSize);
+
+        return ServiceResult<PaginatedList<TransactionResponseDto>>.SuccessResult(paginatedTransactions, "Transactions retrieved successfully.");
     }
 
     private static string GenerateAccountNumber()
