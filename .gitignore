@@ -56,7 +56,9 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 
-*.db
+*.db*
 **/Migrations/
 .vscode/
 .vs/
+.devdbrc
+.gitignore

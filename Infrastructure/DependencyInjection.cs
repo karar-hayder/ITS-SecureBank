@@ -16,21 +16,9 @@ namespace Backend.Infrastructure
                 ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
             services.AddDbContext<BankDbContext>(options =>
-                options.UseSqlite(connectionString, b => b.MigrationsAssembly("Infrastructure")));
-
-            services.AddIdentityCore<User>(options =>
-            {
-                options.Password.RequireDigit = false;
-                options.Password.RequiredLength = 6;
-                options.Password.RequireLowercase = false;
-                options.Password.RequireNonAlphanumeric = false;
-                options.Password.RequireUppercase = false;
-            })
-            .AddEntityFrameworkStores<BankDbContext>();
+                options.UseNpgsql(connectionString, b => b.MigrationsAssembly("Infrastructure")));
 
             services.AddScoped<IBankDbContext>(provider => provider.GetRequiredService<BankDbContext>());
-
-            services.AddScoped<IBankDbContext, BankDbContext>();
             services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
             return services;
         }
