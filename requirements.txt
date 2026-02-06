@@ -83,8 +83,11 @@ Minimum Fields:
 - owner_user_id
 - account_number (unique)
 - account_type (CHECKING | SAVINGS)
+- account_status (PENDING | ACTIVE | INACTIVE | SUSPENDED | CLOSED)
 - balance (DECIMAL / fixed-point)
 - created_at
+- updated_at
+- account_level (1 | 2 | 3) (For benefits like interest rate, transaction fee, transaction volume, etc.)
 
 NOTE:
 Balance is derived state and must always reconcile with the ledger.
