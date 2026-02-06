@@ -9,7 +9,8 @@ namespace Application.Interfaces
         DbSet<RefreshToken> RefreshTokens { get; set; }
         DbSet<Transaction> Transactions { get; set; }
         DbSet<User> Users { get; set; }
+        DbSet<AuditLog> AuditLogs { get; set; }
         public Task<int> SaveChangesAsync(
-    CancellationToken cancellationToken = default);
+            CancellationToken cancellationToken = default);
     }
 }
