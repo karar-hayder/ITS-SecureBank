@@ -37,10 +37,18 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// DbContext and infrastructure services are registered in the Infrastructure project
-
 builder.Services.AddExceptionHandler<Backend.API.Middleware.GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(builder =>
+    {
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
+    });
+});
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);

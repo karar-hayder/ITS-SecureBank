@@ -2,6 +2,7 @@ using Application.Common.Models;
 using Application.DTOs;
 using Application.Interfaces;
 using Domain.Entities;
+using Domain.Enums;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,63 +10,221 @@ namespace Application.Services;
 
 public class AccountService(IBankDbContext context) : IAccountService
 {
-    public async Task<ServiceResult<AccountDto>> CreateAccountAsync(CreateAccountDto request)
+    public async Task<ServiceResult<AccountResponseDto>> CreateAccountAsync(CreateAccountDto request, int userId)
     {
-        var account = request.Adapt<Account>();
-        // Ensure account number is generated - this should ideally be in a domain service
-        account.AccountNumber = Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper();
+        // Generate unique account number
+        var accountNumber = GenerateAccountNumber();
+        
+        var account = new Account
+        {
+            AccountNumber = accountNumber,
+            AccountType = request.AccountType,
+            Level = request.Level,
+            UserId = userId,
+            Status = AccountStatus.Active,
+            Balance = 0m
+        };
         
         context.Accounts.Add(account);
         await context.SaveChangesAsync();
         
-        return ServiceResult<AccountDto>.SuccessResult(account.Adapt<AccountDto>(), "Account created successfully.", 201);
+        return ServiceResult<AccountResponseDto>.SuccessResult(
+            account.Adapt<AccountResponseDto>(), 
+            "Account created successfully.", 
+            201);
     }
 
-    public async Task<ServiceResult<AccountDto>> GetAccountAsync(int id)
+    public async Task<ServiceResult<AccountResponseDto>> GetAccountAsync(int id, int userId)
     {
         var account = await context.Accounts.FindAsync(id);
+        
         if (account == null)
         {
-            return ServiceResult<AccountDto>.Failure("Account not found.", 404);
+            return ServiceResult<AccountResponseDto>.Failure("Account not found.", 404);
         }
-        return ServiceResult<AccountDto>.SuccessResult(account.Adapt<AccountDto>(), "Account retrieved successfully.");
+
+        // Authorization check: user can only access their own accounts
+        if (account.UserId != userId)
+        {
+            return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to account.", 403);
+        }
+
+        return ServiceResult<AccountResponseDto>.SuccessResult(
+            account.Adapt<AccountResponseDto>(), 
+            "Account retrieved successfully.");
     }
 
-    public async Task<ServiceResult<AccountDto>> UpdateAccountAsync(int id, UpdateAccountDto request)
+    public async Task<ServiceResult<AccountResponseDto>> UpdateAccountAsync(int id, UpdateAccountDto request)
     {
         var account = await context.Accounts.FindAsync(id);
         if (account == null)
         {
-            return ServiceResult<AccountDto>.Failure("Account not found.", 404);
+            return ServiceResult<AccountResponseDto>.Failure("Account not found.", 404);
         }
 
         request.Adapt(account);
         context.Accounts.Update(account);
         await context.SaveChangesAsync();
         
-        return ServiceResult<AccountDto>.SuccessResult(account.Adapt<AccountDto>(), "Account updated successfully.");
+        return ServiceResult<AccountResponseDto>.SuccessResult(
+            account.Adapt<AccountResponseDto>(), 
+            "Account updated successfully.");
     }
 
-    public async Task<ServiceResult<AccountDto>> DeleteAccountAsync(int id)
+    public async Task<ServiceResult<AccountResponseDto>> DeleteAccountAsync(int id)
     {
         var account = await context.Accounts.FindAsync(id);
         if (account == null)
         {
-            return ServiceResult<AccountDto>.Failure("Account not found.", 404);
+            return ServiceResult<AccountResponseDto>.Failure("Account not found.", 404);
         }
 
-        context.Accounts.Remove(account);
+        account.IsDeleted = true;
+        context.Accounts.Update(account);
         await context.SaveChangesAsync();
         
-        return ServiceResult<AccountDto>.SuccessResult(account.Adapt<AccountDto>(), "Account deleted successfully.");
+        return ServiceResult<AccountResponseDto>.SuccessResult(
+            account.Adapt<AccountResponseDto>(), 
+            "Account deleted successfully.");
     }
 
-    public async Task<ServiceResult<List<AccountDto>>> GetAccountsByUserIdAsync(int userId)
+    public async Task<ServiceResult<List<AccountResponseDto>>> GetAccountsByUserIdAsync(int userId)
     {
         var accounts = await context.Accounts
-            .Where(a => a.UserId == userId)
+            .Where(a => a.UserId == userId && !a.IsDeleted)
             .ToListAsync();
             
-        return ServiceResult<List<AccountDto>>.SuccessResult(accounts.Adapt<List<AccountDto>>(), "Accounts retrieved successfully.");
+        return ServiceResult<List<AccountResponseDto>>.SuccessResult(
+            accounts.Adapt<List<AccountResponseDto>>(), 
+            "Accounts retrieved successfully.");
+    }
+
+    public async Task<ServiceResult<AccountResponseDto>> DepositAsync(int accountId, DepositDto request, int userId)
+    {
+        // Use optimistic concurrency control
+        var account = await context.Accounts.FindAsync(accountId);
+        
+        if (account == null)
+        {
+            return ServiceResult<AccountResponseDto>.Failure("Account not found.", 404);
+        }
+
+        // Authorization check
+        if (account.UserId != userId)
+        {
+            return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to account.", 403);
+        }
+
+        // Check account status
+        if (account.Status != AccountStatus.Active)
+        {
+            return ServiceResult<AccountResponseDto>.Failure("Account is not active.", 400);
+        }
+
+        try
+        {
+            // Update balance
+            account.Balance += request.Amount;
+            
+            // Create transaction record
+            var transaction = new Transaction
+            {
+                Type = TransactionType.Credit,
+                Amount = request.Amount,
+                AccountId = accountId,
+                BalanceAfter = account.Balance,
+                ReferenceId = Guid.NewGuid().ToString(),
+                Description = $"Deposit of {request.Amount:C}"
+            };
+
+            context.Transactions.Add(transaction);
+            context.Accounts.Update(account);
+            
+            await context.SaveChangesAsync();
+
+            return ServiceResult<AccountResponseDto>.SuccessResult(
+                account.Adapt<AccountResponseDto>(), 
+                "Deposit successful.");
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ServiceResult<AccountResponseDto>.Failure(
+                "Concurrency conflict. Please try again.", 
+                409);
+        }
+    }
+
+    public async Task<ServiceResult<AccountResponseDto>> WithdrawAsync(int accountId, WithdrawDto request, int userId)
+    {
+        // Use optimistic concurrency control
+        var account = await context.Accounts.FindAsync(accountId);
+        
+        if (account == null)
+        {
+            return ServiceResult<AccountResponseDto>.Failure("Account not found.", 404);
+        }
+
+        // Authorization check
+        if (account.UserId != userId)
+        {
+            return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to account.", 403);
+        }
+
+        // Check account status
+        if (account.Status != AccountStatus.Active)
+        {
+            return ServiceResult<AccountResponseDto>.Failure("Account is not active.", 400);
+        }
+
+        // Check sufficient funds
+        if (account.Balance < request.Amount)
+        {
+            return ServiceResult<AccountResponseDto>.Failure("Insufficient funds.", 400);
+        }
+
+        try
+        {
+            // Update balance
+            account.Balance -= request.Amount;
+            
+            // Create transaction record
+            var transaction = new Transaction
+            {
+                Type = TransactionType.Debit,
+                Amount = request.Amount,
+                AccountId = accountId,
+                BalanceAfter = account.Balance,
+                ReferenceId = Guid.NewGuid().ToString(),
+                Description = $"Withdrawal of {request.Amount:C}"
+            };
+
+            context.Transactions.Add(transaction);
+            context.Accounts.Update(account);
+            
+            await context.SaveChangesAsync();
+
+            return ServiceResult<AccountResponseDto>.SuccessResult(
+                account.Adapt<AccountResponseDto>(), 
+                "Withdrawal successful.");
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ServiceResult<AccountResponseDto>.Failure(
+                "Concurrency conflict. Please try again.", 
+                409);
+        }
+    }
+
+    private static string GenerateAccountNumber()
+    {
+        var random = new Random();
+        var countryCode = "IQ";
+        var checkDigits = random.Next(10, 100).ToString("D2");
+        var bankCode = "NTB"; // NanoTech Bank
+        var accountNumber = random.Next(10000000, 99999999).ToString();
+        var branchCode = random.Next(100000, 999999).ToString();
+
+        return $"{countryCode}{checkDigits}{bankCode}{branchCode}{accountNumber}";
+
     }
 }

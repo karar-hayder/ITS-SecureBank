@@ -12,7 +12,7 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
 
         builder.Property(a => a.AccountNumber)
             .IsRequired()
-            .HasMaxLength(20);
+            .HasMaxLength(34);
 
         builder.HasIndex(a => a.AccountNumber)
             .IsUnique();
