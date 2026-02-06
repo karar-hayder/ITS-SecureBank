@@ -1,11 +1,12 @@
 namespace Domain.Common;
 
-public interface ISoftDeletable
+public interface ISoftDeletableEntity
 {
     public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
 }
 
-public interface IAuditable
+public interface IAuditableEntity
 {
     public int? CreatedBy { get; set; }
     public int? UpdatedBy { get; set; }

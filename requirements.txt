@@ -1,111 +1,262 @@
-Hackathon Project: SecureBank
+SECUREBANK — CORE BANKING API
+HACKATHON REQUIREMENTS (REFINED & COMPLETE)
+
 Duration: 2 Days
-Goal: Build a secure, transactional banking API where users can deposit, withdraw, and transfer
-money without losing a single cent.
+Objective: Build a ledger-based core banking API that guarantees money is never lost, duplicated, or partially applied — even under crashes, malicious input, and high concurrency.
 
-1. The Scenario
-You have been hired to build the backend for a new digital bank. Banking apps look simple on the
-surface, but in the real world, they are incredibly fragile.
-Your stakeholders are paranoid about Data Integrity. They have asked you to build a system that can
-survive:
+This system is evaluated on correctness, resilience, and clarity of architectural reasoning, not feature volume.
 
-Your job is not just to make it work, but to ensure it never breaks.
-⚠️ Scope & Expectations
-We understand that 2 days is a tight deadline.
-While a fully finished application is the goal, the judges prioritize architectural correctness and
-handling of edge cases over feature quantity.
+----------------------------------------------------------------
+1. CORE BANKING PRINCIPLES (NON-NEGOTIABLE)
+----------------------------------------------------------------
 
-2. Domain Modeling
-You are responsible for designing the database schema. You may add fields as necessary, but the
-following are the minimum requirements:
-1. Server Crashes: Power failures happening in the exact middle of a request.
-2. Hackers: Malicious users trying to manipulate inputs.
-3. High Concurrency: Two users (or the same user) clicking "Transfer" at the exact same
-millisecond.
+The system MUST uphold the following invariants at all times:
 
-If you cannot implement a perfect concurrency solution in code, be prepared to explain your
-strategy clearly to the judges.
-For example, it is better to have one bulletproof "Transfer" endpoint than 10 buggy features.
+1. Money Conservation
+- Money cannot be created or destroyed except through explicit operations (deposit, interest).
+- Transfers must have net-zero effect across the system.
 
-1. User: Standard identity management (Id, Email, PasswordHash, FullName, etc.).
-2. Account:
-A user can have multiple accounts (e.g., Savings, Checking).
-Accounts must have a unique business identifier (e.g., IBAN or 10-digit Account Number).
-Constraint: An account balance can never be negative.
-3. Transaction History:
-Every single movement of money (In or Out) must be recorded.
+2. Atomicity
+- Every monetary operation must be all-or-nothing.
+- Partial state (e.g., debit without credit) is forbidden.
 
-3. Core Features (User Stories)
-A. Authentication
+3. Consistency
+- Account balances must never be negative.
+- Account balance must reconcile with transaction history.
 
-B. Wallet Operations
+4. Isolation
+- Concurrent requests must not interfere with each other.
+- Double spending must be impossible, even under simultaneous requests.
 
-C. The Transfer (The Core Challenge)
+5. Durability
+- Once a transaction is committed, it must survive crashes and restarts.
 
-4. Critical System Behaviors (Pass/Fail Criteria)
-This is a hackathon. We are not testing if you can write a controller; we are testing if you can build a
-resilient system.
-1. Atomicity (The "Crash" Test)
-Imagine the power cord is pulled out of the server after you deduct money from User A, but before you
-add it to User B.
+Violating any invariant constitutes system failure.
 
-2. Race Conditions (The "Double Spend" Attack)
-What happens if a user with $100 sends two requests at the exact same millisecond to transfer $100?
-Auditors need to be able to trace exactly where every cent came from and where it went.
+----------------------------------------------------------------
+2. THREAT MODEL
+----------------------------------------------------------------
 
-POST /auth/register: Register a new user and automatically provision an initial Checking account.
-POST /auth/login: Authenticate and return a JWT.
+The system must behave correctly under the following conditions:
 
-POST /accounts: Create a supplementary account.
-GET /accounts: View all accounts belonging to the user with real-time balances.
-POST /accounts/{id}/deposit: Add money (Simulates an ATM deposit).
-POST /accounts/{id}/withdraw: Remove money.
-Validation: Verify sufficient funds before processing.
+2.1 Infrastructure Failures
+- Server crash during request execution
+- Power loss mid-transaction
+- Database restart
 
-POST /transfer: Move money from Account A to Account B.
-Payload: { fromAccountId, toAccountNumber, amount }
-Logic:
-1. Verify the sender owns the source account.
-2. Locate the destination account (using the unique Account Number).
-3. Execute the movement of funds atomically.
-4. Persist transaction records for both the sender and the receiver.
+2.2 Malicious or Invalid Inputs (Zero Trust)
+- Negative or zero amounts
+- Forged account identifiers
+- Unauthorized access attempts
+- Request replays (duplicate submissions)
 
-Requirement: The system must guarantee that money is never lost. The transfer must either fully
-succeed or fully fail. No "half-done" states are allowed.
+2.3 High Concurrency
+- Multiple transfers from the same account at the same millisecond
+- Concurrent deposits, withdrawals, and transfers
 
-3. Input Security (The "Zero Trust" Test)
+----------------------------------------------------------------
+3. DOMAIN MODEL
+----------------------------------------------------------------
 
-4. Auditability
+3.1 User
+Represents an authenticated identity.
 
-🧠 Things to Think About (No Hints Allowed!)
+Minimum Fields:
+- id
+- email (unique)
+- password_hash
+- full_name
+- created_at
 
-🏆 Bonus Challenges
-Implement these high-value features to stand out:
-The Risk: Naive systems will read the balance ($100) for both requests, pass the validation check,
-and allow the user to spend $200 total.
-Requirement: Your system must handle high concurrency. You must demonstrate how you prevent
-this "Double Spend" scenario.
+----------------------------------------------------------------
 
-Users are unpredictable. They might try to transfer negative amounts, zero amounts, or manipulate
-IDs to transfer money they don't own.
-Requirement: Implement strict validation. Assume every input is an attack.
-Edge Case: Should a user be allowed to transfer money to themselves? Ensure this logic is
-handled deliberately.
+3.2 Account
+Represents a financial container owned by a user.
 
-Requirement: An auditor must be able to query GET /accounts/{id}/transactions and
-reconstruct the history of the account balance.
-Requirement: This endpoint must be Paginated to handle large datasets.
+Rules:
+- A user may own multiple accounts (e.g., Checking, Savings).
+- Each account must have a globally unique business identifier.
+- Balance must never be negative.
 
-1. Data Types: What is the industry standard data type for financial calculations? (Choosing the
-wrong one leads to floating-point rounding errors and pennies might be lost over time).
-2. Error Handling: If a transfer fails, does the user receive a generic 500 error, or a descriptive,
-actionable message?
-3. Isolation: When you read a balance to check for sufficient funds, how do you ensure no one else is
-changing that balance in that exact microsecond?
+Minimum Fields:
+- id
+- owner_user_id
+- account_number (unique)
+- account_type (CHECKING | SAVINGS)
+- balance (DECIMAL / fixed-point)
+- created_at
 
-1. Export to CSV: Allow auditors to download transaction history as a .csv or .xlsx file.
-2. Interest Calculation: Create a background job that runs every few seconds (to be demonstrated)
-to add 0.01% interest to all "Savings" accounts.
-3. Idempotency: Ensure that if the client retries the same API call due to network lag, the operation is
-not performed twice.
-4. Feel free to add any additional feature that you see is beneficial and valuable to the system.
+NOTE:
+Balance is derived state and must always reconcile with the ledger.
+
+----------------------------------------------------------------
+
+3.3 Transaction (Ledger Entry)
+Immutable record of every money movement.
+
+Rules:
+- Every monetary operation must create one or more transactions.
+- Transactions are append-only and never updated or deleted.
+
+Minimum Fields:
+- id
+- account_id
+- type (DEBIT | CREDIT)
+- amount (positive, fixed-point)
+- reference_id (shared identifier for grouped operations)
+- description
+- created_at
+
+----------------------------------------------------------------
+4. CORE FUNCTIONAL REQUIREMENTS
+----------------------------------------------------------------
+
+4.1 Authentication
+
+POST /auth/register
+- Registers a new user
+- Automatically provisions a default Checking account
+
+POST /auth/login
+- Authenticates user
+- Returns a JWT
+
+All protected endpoints require authentication.
+
+----------------------------------------------------------------
+
+4.2 Account Management
+
+POST /accounts
+- Creates a supplementary account for the authenticated user
+
+GET /accounts
+- Returns all accounts owned by the user
+- Includes real-time balances
+
+----------------------------------------------------------------
+
+4.3 Deposits
+
+POST /accounts/{id}/deposit
+
+Rules:
+- Amount must be > 0
+- Creates a CREDIT ledger entry
+- Operation must be atomic
+
+----------------------------------------------------------------
+
+4.4 Withdrawals
+
+POST /accounts/{id}/withdraw
+
+Rules:
+- Amount must be > 0
+- Sufficient funds required
+- Creates a DEBIT ledger entry
+- Operation must be atomic
+
+----------------------------------------------------------------
+5. TRANSFERS (CORE BANKING OPERATION)
+----------------------------------------------------------------
+
+POST /transfer
+
+Input Payload:
+{
+  "fromAccountId": "...",
+  "toAccountNumber": "...",
+  "amount": 100.00
+}
+
+Transfer Invariants:
+1. Sender must own the source account
+2. Destination account must exist
+3. Amount must be positive
+4. Source account must have sufficient funds
+5. Operation must be fully atomic
+6. Operation must be concurrency-safe
+7. Two ledger entries must be recorded:
+   - DEBIT for sender
+   - CREDIT for receiver
+
+Atomicity Guarantee:
+- Either both ledger entries are committed
+- Or no state change occurs at all
+
+No half-done states are allowed.
+
+----------------------------------------------------------------
+6. CONCURRENCY & ISOLATION REQUIREMENTS
+----------------------------------------------------------------
+
+The system must prevent double spending.
+
+Naive logic that:
+- Reads balance
+- Validates
+- Updates later
+is unacceptable.
+
+The implementation must ensure that:
+- Only one transaction can affect an account’s spendable balance at a time
+
+If perfect implementation is not possible, a clear and correct strategy must be explained.
+
+----------------------------------------------------------------
+7. AUDITABILITY
+----------------------------------------------------------------
+
+GET /accounts/{id}/transactions
+
+Requirements:
+- Returns full transaction history for the account
+- Results must be paginated
+- An auditor must be able to reconstruct the balance from this data alone
+
+Optional:
+- Export transactions as CSV or XLSX
+
+----------------------------------------------------------------
+8. DATA & ERROR HANDLING STANDARDS
+----------------------------------------------------------------
+
+8.1 Financial Data Types
+- Floating point types are forbidden
+- Use DECIMAL / NUMERIC or smallest currency unit (e.g., cents)
+
+8.2 Error Handling
+- Errors must be deterministic and descriptive
+- No generic 500 errors for business rule violations
+- No internal system details leaked
+
+----------------------------------------------------------------
+9. BONUS (HIGH-VALUE FEATURES)
+----------------------------------------------------------------
+
+1. Idempotency
+- Replaying the same request must not duplicate effects
+
+2. Interest Job
+- Background process applying 0.01% interest to Savings accounts
+- Must be concurrency-safe
+
+3. Additional Enhancements
+- Any feature that improves safety, auditability, or correctness
+
+----------------------------------------------------------------
+10. EVALUATION CRITERIA
+----------------------------------------------------------------
+
+Judges will prioritize:
+- Correctness over completeness
+- Clear core banking reasoning
+- Ability to explain failure scenarios
+- Confidence in concurrency and atomicity strategy
+
+One bulletproof transfer is worth more than ten unstable features.
+
+----------------------------------------------------------------
+END OF SPECIFICATION
+----------------------------------------------------------------

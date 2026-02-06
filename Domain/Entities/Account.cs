@@ -3,17 +3,14 @@ namespace Domain.Entities;
 using Domain.Common;
 using Domain.Enums;
 
-public class Account : BaseEntity
+public class Account : BaseEntity, IAuditableEntity, ISoftDeletableEntity
 {
-    public required string AccountNumber { get; set; } // Unique 10-digit account number
+    public required string AccountNumber { get; set; }
     public required AccountType AccountType { get; set; }
-    public decimal Balance { get; set; } = 0m; // Using decimal for financial precision
+    public decimal Balance { get; set; } = 0m;
     public int UserId { get; set; }
-    
-    // Concurrency token for optimistic locking to prevent race conditions
+    public AccountStatus Status { get; set; } = AccountStatus.Pending;
     public byte[] RowVersion { get; set; } = null!;
-    
-    // Navigation properties
     public virtual User User { get; set; } = null!;
     public virtual ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
 }
