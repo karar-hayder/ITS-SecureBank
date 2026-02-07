@@ -26,7 +26,7 @@ namespace Infrastructure.Authentication
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.FullName),
                 new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
-                new Claim(ClaimTypes.Role, user.UserRole.ToString()),
+                new Claim(ClaimTypes.Role, user.userRole.ToString()),
             };
 
             var tokenDescriptor = new SecurityTokenDescriptor

@@ -9,6 +9,6 @@ public class User : BaseEntity, IAuditableEntity, ISoftDeletableEntity
     public string Email { get; set; } = null!;
     public string PhoneNumber { get; set; } = null!;
     public string PasswordHash { get; set; } = null!;
-    public UserRole Role { get; set; } = UserRole.User;
+    public UserRole userRole { get; set; } = UserRole.User;
     public virtual ICollection<Account> Accounts { get; set; } = new List<Account>();
 }
