@@ -48,6 +48,18 @@ public class AccountController(IAccountService accountService) : BaseController
         return Ok(result.Data);
     }
 
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetAccount(int id)
+    {
+        var userId = GetUserIdFromClaims();
+        if (userId == null) return Unauthorized("User not authenticated.");
+
+        var result = await accountService.GetAccountAsync(id, userId.Value);
+        if (!result.Success) return NotFound(result.Message);
+        
+        return Ok(result.Data);
+    }
+
     [HttpPost("{id}/deposit")]
     [TypeFilter(typeof(API.Filters.IdempotentAttribute))]
     public async Task<IActionResult> Deposit(int id, [FromBody] DepositDto request)
