@@ -19,7 +19,7 @@ public class AccountService(IBankDbContext context) : IAccountService
         {
             AccountNumber = accountNumber,
             AccountType = request.AccountType,
-            Level = request.Level,
+            Level = (AccountLevel)1, // Default level for new accounts
             UserId = userId,
             Status = AccountStatus.Pending,
             Balance = 0m
@@ -42,8 +42,6 @@ public class AccountService(IBankDbContext context) : IAccountService
         {
             return ServiceResult<AccountResponseDto>.Failure("Account not found.", 404);
         }
-
-        // Authorization check: user can only access their own accounts
         if (account.UserId != userId)
         {
             return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to account.", 403);

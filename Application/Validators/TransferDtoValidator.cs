@@ -10,13 +10,18 @@ public class TransferDtoValidator : AbstractValidator<TransferDto>
         RuleFor(x => x.FromAccountNumber)
             .NotEmpty()
             .WithMessage("Source account number is required.")
-            .MaximumLength(34);
+            .MaximumLength(34)
+            .WithMessage("Account number cannot exceed 34 characters.");
 
         RuleFor(x => x.ToAccountNumber)
             .NotEmpty()
             .WithMessage("Destination account number is required.")
             .MaximumLength(34)
             .WithMessage("Account number cannot exceed 34 characters.");
+
+        RuleFor(x => x)
+            .Must(x => x.FromAccountNumber != x.ToAccountNumber)
+            .WithMessage("Source and destination account numbers cannot be the same.");
 
         RuleFor(x => x.Amount)
             .GreaterThan(0)
