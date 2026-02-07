@@ -3,12 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using Application.DTOs;
 using static Application.DTOs.AuthDtos;
 using Application.Interfaces;
+using Microsoft.AspNetCore.RateLimiting;
 namespace API.Controller
 {
 
     public class AuthController(IAuthService service) : BaseController
     {
         [HttpPost("register")]
+        [EnableRateLimiting("LoginLimmter")]
         public async Task<IActionResult> Register(RegisterDto request)
         {
             var result = await service.RegisterAsync(request);
@@ -17,6 +19,7 @@ namespace API.Controller
         }
 
         [HttpPost("login")]
+        [EnableRateLimiting("LoginLimmter")]
         public async Task<IActionResult> Login(LoginDto request)
         {
             var result = await service.LoginAsync(request);
