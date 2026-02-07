@@ -4,6 +4,7 @@ using Application.Interfaces;
 using Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace API.Controller;
@@ -12,6 +13,7 @@ namespace API.Controller;
 public class AccountApprovalController(IAccountApprovalService approvalService) : BaseController
 {
     [HttpPost("request")]
+    [EnableRateLimiting("Account")]
     public async Task<IActionResult> RequestApproval([FromForm] AccountApprovalRequestDto request)
     {
         var userId = GetUserIdFromClaims();
@@ -26,6 +28,7 @@ public class AccountApprovalController(IAccountApprovalService approvalService) 
     }
 
     [HttpGet("admin/pending")]
+    [EnableRateLimiting("Account")]
     public async Task<IActionResult> GetPendingRequests([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         if (!IsAdmin()) return Forbid("Access denied. Admin only.");
@@ -39,6 +42,8 @@ public class AccountApprovalController(IAccountApprovalService approvalService) 
     }
 
     [HttpPost("admin/decide")]
+    [EnableRateLimiting("Account")]
+
     public async Task<IActionResult> ApproveOrReject([FromBody] ApproveAccountDto request)
     {
         var adminId = GetUserIdFromClaims();
