@@ -13,6 +13,7 @@ namespace Backend.Application
             services.AddScoped<IAccountApprovalService, AccountApprovalService>();
             services.AddScoped<ITransferService, TransferService>();
             services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<ITransactionExportService, TransactionExportService>();
 
             services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
 
