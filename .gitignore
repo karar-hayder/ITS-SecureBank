@@ -62,3 +62,5 @@ nunit-*.xml
 .vs/
 .devdbrc
 .gitignore
+requirements.txt
+test*.log
