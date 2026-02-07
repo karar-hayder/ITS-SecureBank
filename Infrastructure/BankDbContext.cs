@@ -15,6 +15,7 @@ namespace Infrastructure
         public DbSet<AccountApprovalRequest> AccountApprovalRequests { get; set; }
         public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
         public DbSet<User> Users { get; set; }
+        public DbSet<TransferIntents> TransferIntents { get; set; }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

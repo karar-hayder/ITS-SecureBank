@@ -39,7 +39,7 @@ public class TransferServiceTests
     }
 
     [Fact]
-    public async Task TransferAsync_ShouldSucceed_WhenValid()
+    public async Task CompleteTransfer_ShouldSucceed_WhenValid()
     {
         // Arrange
         _logger.Log("Setup: Creating Sender (1000) and Receiver (500)...");
@@ -49,11 +49,16 @@ public class TransferServiceTests
         _context.Accounts.AddRange(sender, receiver);
         await _context.SaveChangesAsync();
 
-        var request = new TransferDto("ACC-001", "ACC-002", 200m, "Test Transfer");
-        _logger.Log($"Action: Transferring 200 from {sender.AccountNumber} to {receiver.AccountNumber}...");
+        // Simulate creating a transfer intent as the API would
+        var intentResult = await _service.InitiateTransferAsync(sender.AccountNumber, receiver.AccountNumber, sender.UserId);
+        intentResult.Success.Should().BeTrue();
+        var intentId = intentResult.Data;
+        var amount = 200m;
+        var description = "Test Transfer";
+        _logger.Log($"Action: Completing transfer of 200 from {sender.AccountNumber} to {receiver.AccountNumber} (IntentId: {intentId})...");
 
         // Act
-        var result = await _service.TransferAsync(request, 1);
+        var result = await _service.CompleteTransferAsync(intentId, amount, description, sender.UserId);
 
         // Assert
         _logger.Log($"Result: Success={result.Success}, Message={result.Message}");
@@ -69,7 +74,7 @@ public class TransferServiceTests
     }
 
     [Fact]
-    public async Task TransferAsync_ShouldFail_WhenInsufficientFunds()
+    public async Task CompleteTransfer_ShouldFail_WhenInsufficientFunds()
     {
         // Arrange
         _logger.Log("Setup: Creating Sender with 100 balance...");
@@ -79,11 +84,16 @@ public class TransferServiceTests
         _context.Accounts.AddRange(sender, receiver);
         await _context.SaveChangesAsync();
 
-        var request = new TransferDto("ACC-003", "ACC-004", 200m, "Test Transfer");
-        _logger.Log("Action: Attempting to transfer 200...");
+        // Simulate creating a transfer intent as the API would
+        var intentResult = await _service.InitiateTransferAsync(sender.AccountNumber, receiver.AccountNumber, sender.UserId);
+        intentResult.Success.Should().BeTrue();
+        var intentId = intentResult.Data;
+        var amount = 200m;
+        var description = "Test Transfer";
+        _logger.Log("Action: Attempting to complete transfer of 200...");
 
         // Act
-        var result = await _service.TransferAsync(request, 1);
+        var result = await _service.CompleteTransferAsync(intentId, amount, description, sender.UserId);
 
         // Assert
         _logger.Log($"Result: Success={result.Success}, Message={result.Message}");
@@ -94,7 +104,7 @@ public class TransferServiceTests
     }
 
     [Fact]
-    public async Task TransferAsync_ShouldFail_WhenSenderNotOwner()
+    public async Task CompleteTransfer_ShouldFail_WhenSenderNotOwner()
     {
         // Arrange
         _logger.Log("Setup: Creating Sender owned by User 2...");
@@ -104,11 +114,16 @@ public class TransferServiceTests
         _context.Accounts.AddRange(sender, receiver);
         await _context.SaveChangesAsync();
 
-        var request = new TransferDto("ACC-005", "ACC-006", 200m, "Fraud");
-        _logger.Log("Action: User 1 attempting to transfer from User 2's account...");
+        // Simulate creating a transfer intent as the API would (as user 2)
+        var intentResult = await _service.InitiateTransferAsync(sender.AccountNumber, receiver.AccountNumber, sender.UserId);
+        intentResult.Success.Should().BeTrue();
+        var intentId = intentResult.Data;
+        var amount = 200m;
+        var description = "Fraud";
+        _logger.Log("Action: User 1 attempting to complete transfer from User 2's account...");
 
-        // Act
-        var result = await _service.TransferAsync(request, 1);
+        // Act (user 1 tries to complete)
+        var result = await _service.CompleteTransferAsync(intentId, amount, description, /*userId*/ 1);
 
         // Assert
         _logger.Log($"Result: Success={result.Success}, StatusCode={result.StatusCode}");

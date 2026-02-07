@@ -6,7 +6,9 @@ using Domain.Enums;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Polly;
 using Polly.Retry;
+
 using System.Data;
 
 namespace Application.Services;
@@ -14,78 +16,115 @@ namespace Application.Services;
 public class TransferService(IBankDbContext context, ILogger<TransferService> logger) : ITransferService
 {
     private readonly ILogger<TransferService> _logger = logger;
-    public async Task<ServiceResult<AccountResponseDto>> TransferAsync(TransferDto request, int userId)
+
+    public async Task<ServiceResult<string>> InitiateTransferAsync(string fromAccountNumber, string toAccountNumber, int userId)
     {
-        var fromAccount = await context.Accounts.FirstOrDefaultAsync(a => a.AccountNumber == request.FromAccountNumber);
+        var fromAccount = await context.Accounts
+            .FirstOrDefaultAsync(a => a.AccountNumber == fromAccountNumber);
 
         if (fromAccount == null)
-            return ServiceResult<AccountResponseDto>.Failure("Source account not found.", 404);
+            return ServiceResult<string>.Failure("Source account not found.", 404);
 
         if (fromAccount.UserId != userId)
-        {
-            return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to source account.", 403);
-        }
-        if (fromAccount.Status != AccountStatus.Active)
-        {
-            return ServiceResult<AccountResponseDto>.Failure("Source account is not active.", 400);
-        }
+            return ServiceResult<string>.Failure("Unauthorized access to source account.", 403);
 
-        if (fromAccount.Balance < request.Amount)
-        {
-            return ServiceResult<AccountResponseDto>.Failure("Insufficient funds.", 400);
-        }
+        if (fromAccount.Status != AccountStatus.Active)
+            return ServiceResult<string>.Failure("Source account is not active.", 400);
 
         var toAccount = await context.Accounts
-            .FirstOrDefaultAsync(a => a.AccountNumber == request.ToAccountNumber);
+            .FirstOrDefaultAsync(a => a.AccountNumber == toAccountNumber);
 
         if (toAccount == null)
-        {
-            return ServiceResult<AccountResponseDto>.Failure("Destination account not found.", 404);
-        }
+            return ServiceResult<string>.Failure("Destination account not found.", 404);
 
         if (toAccount.Status != AccountStatus.Active)
-        {
-            return ServiceResult<AccountResponseDto>.Failure("Destination account is not active.", 400);
-        }
+            return ServiceResult<string>.Failure("Destination account is not active.", 400);
 
         if (fromAccount.Id == toAccount.Id)
+            return ServiceResult<string>.Failure("Cannot transfer to the same account.", 400);
+
+        var transferIntent = new TransferIntents
         {
-            return ServiceResult<AccountResponseDto>.Failure("Cannot transfer to the same account.", 400);
-        }
+            TransferIntentId = Guid.NewGuid().ToString(),
+            FromAccountId = fromAccount.Id,
+            ToAccountId = toAccount.Id,
+            Status = TransferIntentStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.TransferIntents.Add(transferIntent);
+        await context.SaveChangesAsync();
+
+        return ServiceResult<string>.SuccessResult(transferIntent.TransferIntentId, "Transfer intent created. Use the idempotency key to complete the transfer.");
+    }
+
+    public async Task<ServiceResult<AccountResponseDto>> CompleteTransferAsync(string intentId, decimal amount, string description, int userId)
+    {
+        var transferIntent = await context.TransferIntents
+            .Include(x => x.FromAccount)
+            .Include(x => x.ToAccount)
+            .FirstOrDefaultAsync(x => x.TransferIntentId == intentId);
+
+        if (transferIntent == null)
+            return ServiceResult<AccountResponseDto>.Failure("Transfer intent not found.", 404);
+
+        if (transferIntent.Status != TransferIntentStatus.Pending)
+            return ServiceResult<AccountResponseDto>.Failure("Transfer intent already completed or invalid.", 400);
+
+        // Add null checks for fromAccount and toAccount and return error if either is null
+        var fromAccount = transferIntent.FromAccount;
+        var toAccount = transferIntent.ToAccount;
+
+        if (fromAccount == null)
+            return ServiceResult<AccountResponseDto>.Failure("Source account for transfer intent not found.", 404);
+
+        if (toAccount == null)
+            return ServiceResult<AccountResponseDto>.Failure("Destination account for transfer intent not found.", 404);
+
+        if (fromAccount.UserId != userId)
+            return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to source account.", 403);
+
+        if (fromAccount.Status != AccountStatus.Active)
+            return ServiceResult<AccountResponseDto>.Failure("Source account is not active.", 400);
+
+        if (toAccount.Status != AccountStatus.Active)
+            return ServiceResult<AccountResponseDto>.Failure("Destination account is not active.", 400);
+
+        if (fromAccount.Balance < amount)
+            return ServiceResult<AccountResponseDto>.Failure("Insufficient funds.", 400);
 
         using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         try
         {
-            fromAccount.Balance -= request.Amount;
-
-            toAccount.Balance += request.Amount;
+            fromAccount.Balance -= amount;
+            toAccount.Balance += amount;
 
             var referenceId = Guid.NewGuid().ToString();
 
             var debitTransaction = new Transaction
             {
                 Type = TransactionType.Transfer,
-                Amount = request.Amount,
+                Amount = amount,
                 AccountId = fromAccount.Id,
                 RelatedAccountId = toAccount.Id,
                 BalanceAfter = fromAccount.Balance,
                 ReferenceId = referenceId,
-                Description = string.IsNullOrEmpty(request.Description)
+                Description = string.IsNullOrEmpty(description)
                     ? $"Transfer to {toAccount.AccountNumber}"
-                    : $"Transfer to {toAccount.AccountNumber}: {request.Description}"
+                    : $"Transfer to {toAccount.AccountNumber}: {description}"
             };
 
             var creditTransaction = new Transaction
             {
                 Type = TransactionType.Transfer,
-                Amount = request.Amount,
+                Amount = amount,
                 AccountId = toAccount.Id,
                 RelatedAccountId = fromAccount.Id,
                 BalanceAfter = toAccount.Balance,
                 ReferenceId = referenceId,
-                Description = string.IsNullOrEmpty(request.Description)
+                Description = string.IsNullOrEmpty(description)
                     ? $"Transfer from {fromAccount.AccountNumber}"
-                    : $"Transfer from {fromAccount.AccountNumber}: {request.Description}"
+                    : $"Transfer from {fromAccount.AccountNumber}: {description}"
             };
 
             context.Transactions.Add(debitTransaction);
@@ -93,6 +132,12 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
 
             context.Accounts.Update(fromAccount);
             context.Accounts.Update(toAccount);
+
+            // Mark as complete to ensure idempotency
+            transferIntent.Status = TransferIntentStatus.Completed;
+            transferIntent.Amount = amount;
+            transferIntent.CompletedAt = DateTime.UtcNow;
+            context.TransferIntents.Update(transferIntent);
 
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -112,9 +157,9 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
             _logger.LogError(ex, "Transfer failed");
             return ServiceResult<AccountResponseDto>.Failure($"Transfer failed: {ex.Message}", 500);
         }
+    }
 
-}
-        private static AsyncRetryPolicy CreateRetryPolicy(ILogger logger)
+    private static AsyncRetryPolicy CreateRetryPolicy(ILogger logger)
     {
         return Policy
             .Handle<DbUpdateConcurrencyException>()

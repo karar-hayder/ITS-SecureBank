@@ -12,6 +12,7 @@ namespace Application.Interfaces
         DbSet<AuditLog> AuditLogs { get; set; }
         DbSet<AccountApprovalRequest> AccountApprovalRequests { get; set; }
         DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
+        DbSet<TransferIntents> TransferIntents { get; set; }
         Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade Database { get; }
         public Task<int> SaveChangesAsync(
             CancellationToken cancellationToken = default);
