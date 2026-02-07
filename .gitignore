@@ -61,3 +61,4 @@ nunit-*.xml
 .vscode/
 .vs/
 
+API/uploads/ids/*
