@@ -13,6 +13,6 @@ namespace Application.DTOs
         public record LoginDto(string Email, string Password);
         public record LoginResponseDto(string Token, RefreshTokenDto RefreshToken, UserDto User);
         public record RefreshTokenDto(string Token, string Refreshtoken, int UserId, DateTime ExpiresAt, bool IsRevoked);
-        public record UserDto(int Id, string FullName, string Email, UserRole Role);
+        public record UserDto(int Id, string FullName, string Email, UserRole Role = UserRole.User);
     }
 }
