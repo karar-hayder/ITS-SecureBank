@@ -9,12 +9,12 @@ erDiagram
     Users ||--o{ Accounts : owns
     Users ||--o{ RefreshTokens : has
     Users ||--o{ AccountApprovalRequests : requests
-    
+
     Accounts ||--o{ Transactions : receives
     Accounts ||--o{ AccountApprovalRequests : associated_with
-    
+
     Accounts ||--o{ TransferIntents : from
-    Accounts ||--o{ TransferIntents : to
+    TransferIntents }o--|| Accounts : to
 
     Users {
         int Id PK
@@ -63,7 +63,7 @@ erDiagram
 
     RefreshTokens {
         int Id PK
-        string Refreshtoken
+        string RefreshToken
         datetime ExpiresAt
         bool IsRevoked
         int UserId FK
