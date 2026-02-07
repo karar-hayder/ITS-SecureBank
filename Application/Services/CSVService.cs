@@ -10,12 +10,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
-using Application.Interfaces;
 using Domain.Entities;
-using Microsoft.EntityFrameworkCore;
-using System.Text;
-using System.Globalization;
-
 namespace Application.Services
 {
         //public class TransactionExportService : ITransactionExportService

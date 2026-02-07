@@ -114,18 +114,6 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
                     : $"Transfer to {toAccount.AccountNumber}: {description}"
             };
 
-                var creditTransaction = new Transaction
-                {
-                    Type = TransactionType.Transfer,
-                    Amount = request.Amount,
-                    AccountId = toAccount.Id,
-                    RelatedAccountId = fromAccount.Id,
-                    BalanceAfter = toAccount.Balance,
-                    ReferenceId = referenceId,
-                    Description = string.IsNullOrEmpty(request.Description)
-                        ? $"Transfer from {fromAccount.AccountNumber}"
-                        : $"Transfer from {fromAccount.AccountNumber}: {request.Description}"
-                };
             var creditTransaction = new Transaction
             {
                 Type = TransactionType.Transfer,
@@ -139,8 +127,8 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
                     : $"Transfer from {fromAccount.AccountNumber}: {description}"
             };
 
-                context.Transactions.Add(debitTransaction);
-                context.Transactions.Add(creditTransaction);
+            context.Transactions.Add(debitTransaction);
+            context.Transactions.Add(creditTransaction);
 
             context.Accounts.Update(fromAccount);
             context.Accounts.Update(toAccount);

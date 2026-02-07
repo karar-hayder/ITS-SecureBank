@@ -44,14 +44,19 @@ namespace Application.Services
 
         public async Task<ServiceResult<LoginResponseDto>> LoginAsync(LoginDto request)
         {
-            var user = await context.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
+            var user = await context.Users
+                .AsNoTracking() 
+                .FirstOrDefaultAsync(x => x.Email == request.Email);
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 return ServiceResult<LoginResponseDto>.Failure("Invalid email or password.", 401);
             }
 
+            var userDto = new UserDto(user.Id, user.FullName, user.Email, user.userRole);
+
             var token = jwt.GenerateToken(user);
+
             var refreshToken = new RefreshToken
             {
                 UserId = user.Id,
@@ -64,7 +69,9 @@ namespace Application.Services
             await context.SaveChangesAsync();
 
             var refreshtokenDto = refreshToken.Adapt<RefreshTokenDto>();
-            return ServiceResult<LoginResponseDto>.SuccessResult(new LoginResponseDto(token, refreshtokenDto, user.Adapt<UserDto>()));
+            return ServiceResult<LoginResponseDto>.SuccessResult(
+                new LoginResponseDto(token, refreshtokenDto, userDto)
+            );
         }
 
         public async Task<ServiceResult<RefreshTokenDto>> RefreshToken(string refreshToken)
