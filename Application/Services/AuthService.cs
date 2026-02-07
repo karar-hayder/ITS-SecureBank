@@ -11,48 +11,42 @@ using static Application.DTOs.AuthDtos;
 using Application.Interfaces;
 using Application.DTOs;
 using Domain.Enums;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Services
 {
     public class AuthService(
-        IJwtTokenGenerator jwt, 
-        IBankDbContext context, 
-        UserManager<User> userManager,
-        IAccountService accountService) : IAuthService
+        IJwtTokenGenerator jwt,
+        IBankDbContext context,
+        ILogger<AuthService> logger) : IAuthService
     {
         public async Task<ServiceResult<UserDto>> RegisterAsync(RegisterDto request)
         {
             var user = new User
             {
-                UserName = request.Email,
                 Email = request.Email,
-                FullName = request.FullName
+                FullName = request.FullName,
+                PhoneNumber = request.PhoneNumber,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
             };
 
-            var result = await userManager.CreateAsync(user, request.Password);
+            await context.Users.AddAsync(user);
+            var saved = await context.SaveChangesAsync();
 
-            if (!result.Succeeded)
+            if (saved == 0)
             {
-                return ServiceResult<UserDto>.Failure(string.Join(", ", result.Errors.Select(e => e.Description)));
+                return ServiceResult<UserDto>.Failure("User registration failed.", 500);
             }
-
-            // Requirement 4.1: Automatically provisions a default Checking account
-            await accountService.CreateAccountAsync(new CreateAccountDto(
-                AccountType: AccountType.Checking,
-                UserId: user.Id,
-                Level: AccountLevel.Level1
-            ));
-
+            logger.LogInformation("User registered successfully: {User}", user);
             return ServiceResult<UserDto>.SuccessResult(user.Adapt<UserDto>(), "User registered successfully.", 201);
         }
 
         public async Task<ServiceResult<LoginResponseDto>> LoginAsync(LoginDto request)
         {
-            var user = await userManager.FindByEmailAsync(request.Email);
+            var user = await context.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
 
-            if (user == null || !await userManager.CheckPasswordAsync(user, request.Password))
+            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 return ServiceResult<LoginResponseDto>.Failure("Invalid email or password.", 401);
             }
@@ -66,8 +60,8 @@ namespace Application.Services
                 IsRevoked = false
             };
 
-            context.RefreshTokens.Add(refreshToken);
-            await context.SaveChangesAsync(CancellationToken.None);
+            await context.RefreshTokens.AddAsync(refreshToken);
+            await context.SaveChangesAsync();
 
             var refreshtokenDto = refreshToken.Adapt<RefreshTokenDto>();
             return ServiceResult<LoginResponseDto>.SuccessResult(new LoginResponseDto(token, refreshtokenDto, user.Adapt<UserDto>()));
@@ -83,7 +77,7 @@ namespace Application.Services
                 return ServiceResult<RefreshTokenDto>.Failure("Invalid refresh Token.", 401);
             }
 
-            var user = await userManager.FindByIdAsync(storedToken.UserId.ToString());
+            var user = await context.Users.FirstOrDefaultAsync(x => x.Id == storedToken.UserId);
 
             if (user == null)
             {
@@ -100,8 +94,8 @@ namespace Application.Services
             };
 
             storedToken.IsRevoked = true;
-            context.RefreshTokens.Add(newRefreshToken);
-            await context.SaveChangesAsync(CancellationToken.None);
+            await context.RefreshTokens.AddAsync(newRefreshToken);
+            await context.SaveChangesAsync();
 
             var response = newRefreshToken.Adapt<RefreshTokenDto>() with { Token = newAccessToken };
             return ServiceResult<RefreshTokenDto>.SuccessResult(response);

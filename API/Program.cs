@@ -6,6 +6,7 @@ using Microsoft.OpenApi.Models;
 using Backend.Application;
 using Backend.Infrastructure;
 using System.Text;
+using Backend.API.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,10 +38,18 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// DbContext and infrastructure services are registered in the Infrastructure project
-
 builder.Services.AddExceptionHandler<Backend.API.Middleware.GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.SetIsOriginAllowed(_ => true)
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -70,7 +79,10 @@ builder.Services.AddAuthorization();
 builder.Services.AddHangfire(config => config.UseMemoryStorage());
 builder.Services.AddHangfireServer();
 
+builder.Services.AddHostedService<API.Jobs.AccountInterestJob>();
+
 builder.Services.AddControllers();
+builder.Services.AddTransient<RequestTimingHandler>();
 
 var app = builder.Build();
 
@@ -84,6 +96,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+app.UseMiddleware<RequestTimingHandler>();
+
+
 app.UseHttpsRedirection();
 
 app.UseAuthentication();

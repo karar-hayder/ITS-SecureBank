@@ -5,10 +5,12 @@ namespace Application.Interfaces;
 
 public interface IAccountService
 {
-    Task<ServiceResult<AccountDto>> CreateAccountAsync(CreateAccountDto request);
-    Task<ServiceResult<AccountDto>> GetAccountAsync(int id);
-    Task<ServiceResult<AccountDto>> UpdateAccountAsync(int id, UpdateAccountDto request);
-    Task<ServiceResult<AccountDto>> DeleteAccountAsync(int id);
-    Task<ServiceResult<List<AccountDto>>> GetAccountsByUserIdAsync(int userId);
-    // Task<ServiceResult<PaginatedList<TransactionDto>>> GetAccountTransactionsAsync(int accountId, int pageNumber, int pageSize);
+    Task<ServiceResult<AccountResponseDto>> CreateAccountAsync(CreateAccountDto request, int userId);
+    Task<ServiceResult<AccountResponseDto>> GetAccountAsync(int id, int userId);
+    Task<ServiceResult<AccountResponseDto>> UpdateAccountAsync(int id, UpdateAccountDto request);
+    Task<ServiceResult<AccountResponseDto>> DeleteAccountAsync(int id);
+    Task<ServiceResult<List<AccountResponseDto>>> GetAccountsByUserIdAsync(int userId);
+    Task<ServiceResult<AccountResponseDto>> DepositAsync(int accountId, DepositDto request, int userId);
+    Task<ServiceResult<AccountResponseDto>> WithdrawAsync(int accountId, WithdrawDto request, int userId);
+    Task<ServiceResult<PaginatedList<TransactionResponseDto>>> GetTransactionsAsync(int accountId, int userId, int pageNumber, int pageSize);
 }

@@ -1,8 +1,9 @@
 using Application.Common.Models;
+using Application.DTOs;
 
 namespace Application.Interfaces;
 
 public interface ITransferService
 {
-    Task<TransferResponse> TransferAsync(TransferRequest request);
+    Task<ServiceResult<AccountResponseDto>> TransferAsync(TransferDto request, int userId);
 }

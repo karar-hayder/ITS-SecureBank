@@ -1,5 +1,5 @@
 SECUREBANK — CORE BANKING API
-HACKATHON REQUIREMENTS (REFINED & COMPLETE)
+HACKATHON REQUIREMENTS
 
 Duration: 2 Days
 Objective: Build a ledger-based core banking API that guarantees money is never lost, duplicated, or partially applied — even under crashes, malicious input, and high concurrency.
