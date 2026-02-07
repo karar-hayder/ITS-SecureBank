@@ -27,7 +27,7 @@ public class AuthServiceTests
     public AuthServiceTests(ITestOutputHelper output)
     {
         _logger = new TestLogger(output);
-        
+
         var options = new DbContextOptionsBuilder<BankDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
@@ -35,7 +35,7 @@ public class AuthServiceTests
 
         _jwtMock = new Mock<IJwtTokenGenerator>();
         _loggerMock = new Mock<ILogger<AuthService>>();
-        
+
         _service = new AuthService(_jwtMock.Object, _context, _loggerMock.Object);
     }
 
@@ -54,7 +54,7 @@ public class AuthServiceTests
         _logger.Log($"Result: Success={result.Success}, Message={result.Message}");
         result.Success.Should().BeTrue();
         result.Data!.Email.Should().Be(request.Email);
-        
+
         var userInDb = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
         userInDb.Should().NotBeNull();
         BCrypt.Net.BCrypt.Verify(request.Password, userInDb!.PasswordHash).Should().BeTrue();
@@ -91,7 +91,7 @@ public class AuthServiceTests
         result.Success.Should().BeTrue();
         result.Data!.Token.Should().Be("fake-jwt-token");
         result.Data.RefreshToken.Refreshtoken.Should().Be("fake-refresh-token");
-        
+
         var tokenInDb = await _context.RefreshTokens.FirstOrDefaultAsync(t => t.UserId == user.Id);
         tokenInDb.Should().NotBeNull();
         _logger.Log("Verified: Refresh token stored in DB.");

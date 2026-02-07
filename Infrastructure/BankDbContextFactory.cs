@@ -10,7 +10,7 @@ namespace Infrastructure
         {
             var optionsBuilder = new DbContextOptionsBuilder<BankDbContext>();
             optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=bank_db;Username=postgres;Password=password");
-            
+
             return new BankDbContext(optionsBuilder.Options);
         }
     }

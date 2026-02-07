@@ -17,8 +17,8 @@ using Microsoft.Extensions.Logging;
 namespace Application.Services
 {
     public class AuthService(
-        IJwtTokenGenerator jwt, 
-        IBankDbContext context, 
+        IJwtTokenGenerator jwt,
+        IBankDbContext context,
         ILogger<AuthService> logger) : IAuthService
     {
         public async Task<ServiceResult<UserDto>> RegisterAsync(RegisterDto request)
@@ -45,7 +45,7 @@ namespace Application.Services
         public async Task<ServiceResult<LoginResponseDto>> LoginAsync(LoginDto request)
         {
             var user = await context.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
-            
+
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 return ServiceResult<LoginResponseDto>.Failure("Invalid email or password.", 401);

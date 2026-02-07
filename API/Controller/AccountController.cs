@@ -20,7 +20,7 @@ public class AccountController(IAccountService accountService) : BaseController
         }
 
         var result = await accountService.CreateAccountAsync(request, userId.Value);
-        
+
         if (!result.Success)
         {
             return StatusCode(result.StatusCode, new { message = result.Message });
@@ -39,7 +39,7 @@ public class AccountController(IAccountService accountService) : BaseController
         }
 
         var result = await accountService.GetAccountsByUserIdAsync(userId.Value);
-        
+
         if (!result.Success)
         {
             return StatusCode(result.StatusCode, new { message = result.Message });
@@ -74,7 +74,7 @@ public class AccountController(IAccountService accountService) : BaseController
         }
 
         var result = await accountService.WithdrawAsync(id, request, userId.Value);
-        
+
         if (!result.Success)
         {
             return StatusCode(result.StatusCode, new { message = result.Message });
@@ -86,7 +86,7 @@ public class AccountController(IAccountService accountService) : BaseController
     private int? GetUserIdFromClaims()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        
+
         if (string.IsNullOrEmpty(userIdClaim))
         {
             return null;
@@ -105,7 +105,7 @@ public class AccountController(IAccountService accountService) : BaseController
         }
 
         var result = await accountService.GetTransactionsAsync(id, userId.Value, page, pageSize);
-        
+
         if (!result.Success)
         {
             return StatusCode(result.StatusCode, new { message = result.Message });

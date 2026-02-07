@@ -25,7 +25,7 @@ public class AccountApprovalServiceTests
     public AccountApprovalServiceTests(ITestOutputHelper output)
     {
         _logger = new TestLogger(output);
-        
+
         var options = new DbContextOptionsBuilder<BankDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
@@ -40,13 +40,13 @@ public class AccountApprovalServiceTests
         // Arrange
         _logger.Log("Test: RequestApprovalAsync_ShouldSucceed_WhenValid");
         var userId = 1;
-        var account = new Account 
-        { 
+        var account = new Account
+        {
             Id = 10,
-            AccountNumber = "PENDING-001", 
-            UserId = userId, 
-            Status = AccountStatus.Pending, 
-            AccountType = AccountType.Checking 
+            AccountNumber = "PENDING-001",
+            UserId = userId,
+            Status = AccountStatus.Pending,
+            AccountType = AccountType.Checking
         };
         _context.Accounts.Add(account);
         await _context.SaveChangesAsync();
@@ -68,7 +68,7 @@ public class AccountApprovalServiceTests
         // Assert
         _logger.Log($"Result: Success={result.Success}, Message={result.Message}");
         result.Success.Should().BeTrue();
-        
+
         var approvalRequest = await _context.AccountApprovalRequests.FirstOrDefaultAsync(r => r.AccountId == account.Id);
         approvalRequest.Should().NotBeNull();
         approvalRequest!.IdDocumentUrl.Should().Contain(fileName);
@@ -103,10 +103,10 @@ public class AccountApprovalServiceTests
         // Assert
         _logger.Log($"Result: Success={result.Success}, Message={result.Message}");
         result.Success.Should().BeTrue();
-        
+
         var updatedAccount = await _context.Accounts.FindAsync(account.Id);
         updatedAccount!.Status.Should().Be(AccountStatus.Active);
-        
+
         var updatedRequest = await _context.AccountApprovalRequests.FindAsync(approvalRequest.Id);
         updatedRequest!.IsApproved.Should().BeTrue();
         updatedRequest.ProcessedByAdminId.Should().Be(adminId);

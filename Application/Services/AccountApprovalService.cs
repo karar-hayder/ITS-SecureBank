@@ -15,7 +15,7 @@ public class AccountApprovalService(IBankDbContext context) : IAccountApprovalSe
     public async Task<ServiceResult<string>> RequestApprovalAsync(AccountApprovalRequestDto request, int userId)
     {
         var account = await context.Accounts.FindAsync(request.AccountId);
-        
+
         if (account == null)
             return ServiceResult<string>.Failure("Account not found.", 404);
 
@@ -77,12 +77,12 @@ public class AccountApprovalService(IBankDbContext context) : IAccountApprovalSe
         {
             // If rejected, we might want to keep it pending or move to Rejected/Closed
             // The requirement says "active or inactive or closed"
-            approvalRequest.Account.Status = AccountStatus.Inactive; 
+            approvalRequest.Account.Status = AccountStatus.Inactive;
         }
 
         context.AccountApprovalRequests.Update(approvalRequest);
         context.Accounts.Update(approvalRequest.Account);
-        
+
         await context.SaveChangesAsync();
 
         var status = request.IsApproved ? "approved" : "rejected";
@@ -111,7 +111,7 @@ public class AccountApprovalService(IBankDbContext context) : IAccountApprovalSe
             ));
 
         var list = await PaginatedList<AccountApprovalRequestResponseDto>.CreateAsync(query, pageNumber, pageSize);
-        
+
         return ServiceResult<PaginatedList<AccountApprovalRequestResponseDto>>.SuccessResult(list);
     }
 
@@ -127,12 +127,12 @@ public class AccountApprovalService(IBankDbContext context) : IAccountApprovalSe
 
         var fileName = $"{Guid.NewGuid()}_{file.FileName}";
         var path = Path.Combine(UploadDirectory, fileName);
-        
+
         using (var stream = new FileStream(path, FileMode.Create))
         {
             await file.CopyToAsync(stream);
         }
-        
+
         return path;
     }
 }

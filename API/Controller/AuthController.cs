@@ -5,7 +5,7 @@ using static Application.DTOs.AuthDtos;
 using Application.Interfaces;
 namespace API.Controller
 {
-    
+
     public class AuthController(IAuthService service) : BaseController
     {
         [HttpPost("register")]

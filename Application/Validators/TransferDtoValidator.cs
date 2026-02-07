@@ -28,7 +28,7 @@ public class TransferDtoValidator : AbstractValidator<TransferDto>
             .WithMessage("Transfer amount must be greater than zero.")
             .Must(amount => decimal.Round(amount, 2) == amount)
             .WithMessage("Amount cannot have more than 2 decimal places.");
-            
+
         RuleFor(x => x.Description)
             .MaximumLength(200)
             .WithMessage("Description cannot exceed 200 characters.");

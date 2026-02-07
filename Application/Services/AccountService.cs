@@ -14,7 +14,7 @@ public class AccountService(IBankDbContext context) : IAccountService
     {
         // Generate unique account number
         var accountNumber = GenerateAccountNumber();
-        
+
         var account = new Account
         {
             AccountNumber = accountNumber,
@@ -24,20 +24,20 @@ public class AccountService(IBankDbContext context) : IAccountService
             Status = AccountStatus.Pending,
             Balance = 0m
         };
-        
+
         context.Accounts.Add(account);
         await context.SaveChangesAsync();
-        
+
         return ServiceResult<AccountResponseDto>.SuccessResult(
-            account.Adapt<AccountResponseDto>(), 
-            "Account created successfully.", 
+            account.Adapt<AccountResponseDto>(),
+            "Account created successfully.",
             201);
     }
 
     public async Task<ServiceResult<AccountResponseDto>> GetAccountAsync(int id, int userId)
     {
         var account = await context.Accounts.FindAsync(id);
-        
+
         if (account == null)
         {
             return ServiceResult<AccountResponseDto>.Failure("Account not found.", 404);
@@ -48,7 +48,7 @@ public class AccountService(IBankDbContext context) : IAccountService
         }
 
         return ServiceResult<AccountResponseDto>.SuccessResult(
-            account.Adapt<AccountResponseDto>(), 
+            account.Adapt<AccountResponseDto>(),
             "Account retrieved successfully.");
     }
 
@@ -63,9 +63,9 @@ public class AccountService(IBankDbContext context) : IAccountService
         request.Adapt(account);
         context.Accounts.Update(account);
         await context.SaveChangesAsync();
-        
+
         return ServiceResult<AccountResponseDto>.SuccessResult(
-            account.Adapt<AccountResponseDto>(), 
+            account.Adapt<AccountResponseDto>(),
             "Account updated successfully.");
     }
 
@@ -80,9 +80,9 @@ public class AccountService(IBankDbContext context) : IAccountService
         account.IsDeleted = true;
         context.Accounts.Update(account);
         await context.SaveChangesAsync();
-        
+
         return ServiceResult<AccountResponseDto>.SuccessResult(
-            account.Adapt<AccountResponseDto>(), 
+            account.Adapt<AccountResponseDto>(),
             "Account deleted successfully.");
     }
 
@@ -91,9 +91,9 @@ public class AccountService(IBankDbContext context) : IAccountService
         var accounts = await context.Accounts
             .Where(a => a.UserId == userId && !a.IsDeleted)
             .ToListAsync();
-            
+
         return ServiceResult<List<AccountResponseDto>>.SuccessResult(
-            accounts.Adapt<List<AccountResponseDto>>(), 
+            accounts.Adapt<List<AccountResponseDto>>(),
             "Accounts retrieved successfully.");
     }
 
@@ -101,7 +101,7 @@ public class AccountService(IBankDbContext context) : IAccountService
     {
         // Use optimistic concurrency control
         var account = await context.Accounts.FindAsync(accountId);
-        
+
         if (account == null)
         {
             return ServiceResult<AccountResponseDto>.Failure("Account not found.", 404);
@@ -123,7 +123,7 @@ public class AccountService(IBankDbContext context) : IAccountService
         {
             // Update balance
             account.Balance += request.Amount;
-            
+
             // Create transaction record
             var transaction = new Transaction
             {
@@ -137,17 +137,17 @@ public class AccountService(IBankDbContext context) : IAccountService
 
             context.Transactions.Add(transaction);
             context.Accounts.Update(account);
-            
+
             await context.SaveChangesAsync();
 
             return ServiceResult<AccountResponseDto>.SuccessResult(
-                account.Adapt<AccountResponseDto>(), 
+                account.Adapt<AccountResponseDto>(),
                 "Deposit successful.");
         }
         catch (DbUpdateConcurrencyException)
         {
             return ServiceResult<AccountResponseDto>.Failure(
-                "Concurrency conflict. Please try again.", 
+                "Concurrency conflict. Please try again.",
                 409);
         }
     }
@@ -156,7 +156,7 @@ public class AccountService(IBankDbContext context) : IAccountService
     {
         // Use optimistic concurrency control
         var account = await context.Accounts.FindAsync(accountId);
-        
+
         if (account == null)
         {
             return ServiceResult<AccountResponseDto>.Failure("Account not found.", 404);
@@ -184,7 +184,7 @@ public class AccountService(IBankDbContext context) : IAccountService
         {
             // Update balance
             account.Balance -= request.Amount;
-            
+
             // Create transaction record
             var transaction = new Transaction
             {
@@ -198,17 +198,17 @@ public class AccountService(IBankDbContext context) : IAccountService
 
             context.Transactions.Add(transaction);
             context.Accounts.Update(account);
-            
+
             await context.SaveChangesAsync();
 
             return ServiceResult<AccountResponseDto>.SuccessResult(
-                account.Adapt<AccountResponseDto>(), 
+                account.Adapt<AccountResponseDto>(),
                 "Withdrawal successful.");
         }
         catch (DbUpdateConcurrencyException)
         {
             return ServiceResult<AccountResponseDto>.Failure(
-                "Concurrency conflict. Please try again.", 
+                "Concurrency conflict. Please try again.",
                 409);
         }
     }

@@ -19,13 +19,13 @@ public class RequestTimingHandler : IMiddleware
             var duration = DateTime.UtcNow - startTime;
             context.Response.Headers.Append("X-Request-Duration", duration.TotalMilliseconds.ToString());
             return Task.CompletedTask;
-        }); 
+        });
 
-        await next(context);        
+        await next(context);
         var totalDuration = DateTime.UtcNow - startTime;
         logger.LogInformation("Request duration: {Duration} ms", totalDuration.TotalMilliseconds);
 
-        if(totalDuration.TotalMilliseconds > 1000)
+        if (totalDuration.TotalMilliseconds > 1000)
         {
             logger.LogWarning("Request duration is too long: {Duration} ms", totalDuration.TotalMilliseconds);
         }

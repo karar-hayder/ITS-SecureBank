@@ -28,7 +28,7 @@ public class IdempotencyAttributeTests
     public IdempotencyAttributeTests(ITestOutputHelper output)
     {
         _logger = new TestLogger(output);
-        
+
         // Setup In-Memory DB
         var options = new DbContextOptionsBuilder<BankDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
@@ -68,9 +68,9 @@ public class IdempotencyAttributeTests
         // Arrange
         _logger.Log("Test: Should_Ignore_When_Header_Missing");
         _httpContextMock.Setup(c => c.Request.Headers).Returns(new HeaderDictionary());
-        
+
         var nextCalled = false;
-        ActionExecutionDelegate next = () => 
+        ActionExecutionDelegate next = () =>
         {
             nextCalled = true;
             return Task.FromResult(new ActionExecutedContext(_actionContext, new List<IFilterMetadata>(), new object()));
@@ -94,14 +94,14 @@ public class IdempotencyAttributeTests
         var userId = 1;
         var responseBody = "{\"message\": \"Cached Response\"}";
 
-        _context.IdempotencyRecords.Add(new IdempotencyRecord 
-        { 
-            Key = key, 
-            UserId = userId, 
-            Path = "/test", 
-            Method = "POST", 
-            ResponseStatusCode = 200, 
-            ResponseBody = responseBody 
+        _context.IdempotencyRecords.Add(new IdempotencyRecord
+        {
+            Key = key,
+            UserId = userId,
+            Path = "/test",
+            Method = "POST",
+            ResponseStatusCode = 200,
+            ResponseBody = responseBody
         });
         await _context.SaveChangesAsync();
 

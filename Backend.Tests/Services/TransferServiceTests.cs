@@ -45,7 +45,7 @@ public class TransferServiceTests
         _logger.Log("Setup: Creating Sender (1000) and Receiver (500)...");
         var sender = new Account { AccountNumber = "ACC-001", Balance = 1000m, UserId = 1, Status = AccountStatus.Active, AccountType = AccountType.Checking };
         var receiver = new Account { AccountNumber = "ACC-002", Balance = 500m, UserId = 2, Status = AccountStatus.Active, AccountType = AccountType.Checking };
-        
+
         _context.Accounts.AddRange(sender, receiver);
         await _context.SaveChangesAsync();
 
@@ -58,13 +58,13 @@ public class TransferServiceTests
         // Assert
         _logger.Log($"Result: Success={result.Success}, Message={result.Message}");
         result.Success.Should().BeTrue();
-        
+
         sender.Balance.Should().Be(800m);
         receiver.Balance.Should().Be(700m);
         _logger.Log($"Verified: Sender Balance ({sender.Balance}) == 800, Receiver Balance ({receiver.Balance}) == 700");
-        
+
         var transactions = await _context.Transactions.ToListAsync();
-        transactions.Should().HaveCount(2); 
+        transactions.Should().HaveCount(2);
         _logger.Log("Verified: 2 Ledger Entries created.");
     }
 
@@ -75,7 +75,7 @@ public class TransferServiceTests
         _logger.Log("Setup: Creating Sender with 100 balance...");
         var sender = new Account { AccountNumber = "ACC-003", Balance = 100m, UserId = 1, Status = AccountStatus.Active, AccountType = AccountType.Checking };
         var receiver = new Account { AccountNumber = "ACC-004", Balance = 500m, UserId = 2, Status = AccountStatus.Active, AccountType = AccountType.Checking };
-        
+
         _context.Accounts.AddRange(sender, receiver);
         await _context.SaveChangesAsync();
 
@@ -92,15 +92,15 @@ public class TransferServiceTests
         sender.Balance.Should().Be(100m);
         _logger.Log("Verified: Transfer failed and balance remained 100.");
     }
-    
+
     [Fact]
     public async Task TransferAsync_ShouldFail_WhenSenderNotOwner()
     {
-         // Arrange
+        // Arrange
         _logger.Log("Setup: Creating Sender owned by User 2...");
-        var sender = new Account { AccountNumber = "ACC-005", Balance = 1000m, UserId = 2, Status = AccountStatus.Active, AccountType = AccountType.Checking }; 
+        var sender = new Account { AccountNumber = "ACC-005", Balance = 1000m, UserId = 2, Status = AccountStatus.Active, AccountType = AccountType.Checking };
         var receiver = new Account { AccountNumber = "ACC-006", Balance = 500m, UserId = 3, Status = AccountStatus.Active, AccountType = AccountType.Checking };
-        
+
         _context.Accounts.AddRange(sender, receiver);
         await _context.SaveChangesAsync();
 
@@ -108,7 +108,7 @@ public class TransferServiceTests
         _logger.Log("Action: User 1 attempting to transfer from User 2's account...");
 
         // Act
-        var result = await _service.TransferAsync(request, 1); 
+        var result = await _service.TransferAsync(request, 1);
 
         // Assert
         _logger.Log($"Result: Success={result.Success}, StatusCode={result.StatusCode}");

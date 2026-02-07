@@ -5,7 +5,7 @@ using System.Reflection;
 
 namespace Infrastructure
 {
-    public class BankDbContext(DbContextOptions options) 
+    public class BankDbContext(DbContextOptions options)
         : DbContext(options), IBankDbContext
     {
         public DbSet<Account> Accounts { get; set; }
@@ -25,7 +25,7 @@ namespace Infrastructure
         {
             base.OnModelCreating(modelBuilder);
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
-            
+
         }
     }
 }

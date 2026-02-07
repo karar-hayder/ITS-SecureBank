@@ -15,7 +15,7 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
     public async Task<ServiceResult<AccountResponseDto>> TransferAsync(TransferDto request, int userId)
     {
         var fromAccount = await context.Accounts.FirstOrDefaultAsync(a => a.AccountNumber == request.FromAccountNumber);
-        
+
         if (fromAccount == null)
             return ServiceResult<AccountResponseDto>.Failure("Source account not found.", 404);
 
@@ -45,17 +45,17 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
         {
             return ServiceResult<AccountResponseDto>.Failure("Destination account is not active.", 400);
         }
-        
+
         if (fromAccount.Id == toAccount.Id)
         {
-             return ServiceResult<AccountResponseDto>.Failure("Cannot transfer to the same account.", 400);
+            return ServiceResult<AccountResponseDto>.Failure("Cannot transfer to the same account.", 400);
         }
 
         using var transaction = await context.Database.BeginTransactionAsync();
         try
         {
             fromAccount.Balance -= request.Amount;
-            
+
             toAccount.Balance += request.Amount;
 
             var referenceId = Guid.NewGuid().ToString();
@@ -68,8 +68,8 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
                 RelatedAccountId = toAccount.Id,
                 BalanceAfter = fromAccount.Balance,
                 ReferenceId = referenceId,
-                Description = string.IsNullOrEmpty(request.Description) 
-                    ? $"Transfer to {toAccount.AccountNumber}" 
+                Description = string.IsNullOrEmpty(request.Description)
+                    ? $"Transfer to {toAccount.AccountNumber}"
                     : $"Transfer to {toAccount.AccountNumber}: {request.Description}"
             };
 
@@ -81,14 +81,14 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
                 RelatedAccountId = fromAccount.Id,
                 BalanceAfter = toAccount.Balance,
                 ReferenceId = referenceId,
-                Description = string.IsNullOrEmpty(request.Description) 
-                    ? $"Transfer from {fromAccount.AccountNumber}" 
+                Description = string.IsNullOrEmpty(request.Description)
+                    ? $"Transfer from {fromAccount.AccountNumber}"
                     : $"Transfer from {fromAccount.AccountNumber}: {request.Description}"
             };
 
             context.Transactions.Add(debitTransaction);
             context.Transactions.Add(creditTransaction);
-            
+
             context.Accounts.Update(fromAccount);
             context.Accounts.Update(toAccount);
 
@@ -96,7 +96,7 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
             await transaction.CommitAsync();
 
             return ServiceResult<AccountResponseDto>.SuccessResult(
-                fromAccount.Adapt<AccountResponseDto>(), 
+                fromAccount.Adapt<AccountResponseDto>(),
                 "Transfer successful.");
         }
         catch (DbUpdateConcurrencyException)

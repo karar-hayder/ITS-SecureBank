@@ -49,7 +49,7 @@ public class AccountServiceTests
         _logger.Log($"Result: Success={result.Success}, New Balance={account.Balance}");
         result.Success.Should().BeTrue();
         account.Balance.Should().Be(150m);
-        
+
         var tx = await _context.Transactions.FirstOrDefaultAsync();
         tx.Should().NotBeNull();
         tx!.Type.Should().Be(TransactionType.Credit);
@@ -74,7 +74,7 @@ public class AccountServiceTests
         _logger.Log($"Result: Success={result.Success}, New Balance={account.Balance}");
         result.Success.Should().BeTrue();
         account.Balance.Should().Be(60m);
-        
+
         var tx = await _context.Transactions.FirstOrDefaultAsync();
         tx.Should().NotBeNull();
         tx!.Type.Should().Be(TransactionType.Debit);

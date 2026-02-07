@@ -41,10 +41,10 @@ public class AccountInterestJob(
         // 1. Fetch eligible accounts (Savings, Active)
         // Note: For high volume, we would paginate this. For Hackathon, FetchAll is okay-ish but dangerous.
         // Better: Process in batches of 100.
-        
+
         int batchSize = 100;
         int processedCount = 0;
-        
+
         while (true)
         {
             // We need to query accounts that haven't had interest applied recently?
@@ -55,7 +55,7 @@ public class AccountInterestJob(
             // Let's add a "LastInterestAppliedAt" to the Account entity implicitly via a new Transaction Type "Interest" check?
             // No, querying transactions is heavy.
             // For now, let's just loop all Savings accounts.
-            
+
             var accounts = await context.Accounts
                 .Where(a => a.AccountType == AccountType.Savings && a.Status == AccountStatus.Active)
                 .OrderBy(a => a.Id)
@@ -77,11 +77,11 @@ public class AccountInterestJob(
                     {
                         // Reload to get latest version/balance
                         await context.Accounts.Entry(account).ReloadAsync(cancellationToken);
-                        
+
                         if (account.Balance <= 0) return; // No interest on 0 or negative (shouldn't be negative)
 
                         decimal interestAmount = Math.Round(account.Balance * InterestRate, 2);
-                        
+
                         if (interestAmount <= 0) return; // Too small
 
                         account.Balance += interestAmount;
@@ -99,10 +99,10 @@ public class AccountInterestJob(
 
                         context.Transactions.Add(interestTx);
                         // RowVersion handles concurrency here
-                        
+
                         await context.SaveChangesAsync(cancellationToken);
                         await transaction.CommitAsync(cancellationToken);
-                        
+
                         logger.LogInformation("Applied {Amount} interest to Account {AccountId}", interestAmount, account.Id);
                     }
                     catch (DbUpdateConcurrencyException)
@@ -114,12 +114,12 @@ public class AccountInterestJob(
                     }
                     catch (Exception ex)
                     {
-                         logger.LogError(ex, "Failed to apply interest for Account {AccountId}", account.Id);
-                         await transaction.RollbackAsync(cancellationToken);
+                        logger.LogError(ex, "Failed to apply interest for Account {AccountId}", account.Id);
+                        await transaction.RollbackAsync(cancellationToken);
                     }
                 });
             }
-            
+
             processedCount += accounts.Count;
         }
     }

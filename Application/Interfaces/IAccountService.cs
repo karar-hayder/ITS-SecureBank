@@ -5,7 +5,7 @@ namespace Application.Interfaces;
 
 public interface IAccountService
 {
-    Task<ServiceResult<AccountResponseDto>> CreateAccountAsync(CreateAccountDto request , int userId);
+    Task<ServiceResult<AccountResponseDto>> CreateAccountAsync(CreateAccountDto request, int userId);
     Task<ServiceResult<AccountResponseDto>> GetAccountAsync(int id, int userId);
     Task<ServiceResult<AccountResponseDto>> UpdateAccountAsync(int id, UpdateAccountDto request);
     Task<ServiceResult<AccountResponseDto>> DeleteAccountAsync(int id);

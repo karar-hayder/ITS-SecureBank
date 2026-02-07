@@ -18,7 +18,7 @@ public class AccountApprovalController(IAccountApprovalService approvalService) 
         if (userId == null) return Unauthorized("User not authenticated.");
 
         var result = await approvalService.RequestApprovalAsync(request, userId.Value);
-        
+
         if (!result.Success)
             return StatusCode(result.StatusCode, new { message = result.Message });
 
@@ -31,7 +31,7 @@ public class AccountApprovalController(IAccountApprovalService approvalService) 
         if (!IsAdmin()) return Forbid("Access denied. Admin only.");
 
         var result = await approvalService.GetPendingRequestsAsync(page, pageSize);
-        
+
         if (!result.Success)
             return StatusCode(result.StatusCode, new { message = result.Message });
 

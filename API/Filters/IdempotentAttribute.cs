@@ -17,23 +17,23 @@ public class IdempotentAttribute : Attribute, IAsyncActionFilter
     {
         if (!context.HttpContext.Request.Headers.TryGetValue(HeaderKey, out var keyVals))
         {
-            await next(); 
+            await next();
             return;
         }
 
         var key = keyVals.FirstOrDefault();
         if (string.IsNullOrEmpty(key))
         {
-             context.Result = new BadRequestObjectResult(new { message = "Idempotency-Key cannot be empty." });
-             return;
+            context.Result = new BadRequestObjectResult(new { message = "Idempotency-Key cannot be empty." });
+            return;
         }
 
         var dbContext = context.HttpContext.RequestServices.GetRequiredService<IBankDbContext>();
         var userIdStr = context.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        
-        if (string.IsNullOrEmpty(userIdStr)) 
+
+        if (string.IsNullOrEmpty(userIdStr))
         {
-            await next(); 
+            await next();
             return;
         }
         int userId = int.Parse(userIdStr);
@@ -46,23 +46,23 @@ public class IdempotentAttribute : Attribute, IAsyncActionFilter
 
         if (existing != null)
         {
-           context.Result = new ContentResult
-           {
-               Content = existing.ResponseBody,
-               ContentType = "application/json",
-               StatusCode = existing.ResponseStatusCode
-           };
-           return;
+            context.Result = new ContentResult
+            {
+                Content = existing.ResponseBody,
+                ContentType = "application/json",
+                StatusCode = existing.ResponseStatusCode
+            };
+            return;
         }
 
         var executedContext = await next();
 
-        if (executedContext.Result is ObjectResult objectResult && 
-            executedContext.Exception == null && 
-            (objectResult.StatusCode >= 200 && objectResult.StatusCode < 500)) 
+        if (executedContext.Result is ObjectResult objectResult &&
+            executedContext.Exception == null &&
+            (objectResult.StatusCode >= 200 && objectResult.StatusCode < 500))
         {
             string jsonResponse = JsonSerializer.Serialize(objectResult.Value);
-            
+
             var record = new IdempotencyRecord
             {
                 Key = key,
@@ -76,10 +76,10 @@ public class IdempotentAttribute : Attribute, IAsyncActionFilter
             dbContext.IdempotencyRecords.Add(record);
             await dbContext.SaveChangesAsync(CancellationToken.None);
         }
-        else if (executedContext.Result is StatusCodeResult statusCodeResult && 
+        else if (executedContext.Result is StatusCodeResult statusCodeResult &&
                  statusCodeResult.StatusCode >= 200 && statusCodeResult.StatusCode < 500)
         {
-             var record = new IdempotencyRecord
+            var record = new IdempotencyRecord
             {
                 Key = key,
                 UserId = userId,

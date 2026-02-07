@@ -21,7 +21,7 @@ public class TransferController(ITransferService transferService) : BaseControll
         }
 
         var result = await transferService.TransferAsync(request, userId.Value);
-        
+
         if (!result.Success)
         {
             return StatusCode(result.StatusCode, new { message = result.Message });
@@ -33,7 +33,7 @@ public class TransferController(ITransferService transferService) : BaseControll
     private int? GetUserIdFromClaims()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        
+
         if (string.IsNullOrEmpty(userIdClaim))
         {
             return null;
