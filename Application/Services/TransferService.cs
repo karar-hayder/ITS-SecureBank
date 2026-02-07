@@ -6,6 +6,8 @@ using Domain.Enums;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Polly.Retry;
+using System.Data;
 
 namespace Application.Services;
 
@@ -51,7 +53,7 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
             return ServiceResult<AccountResponseDto>.Failure("Cannot transfer to the same account.", 400);
         }
 
-        using var transaction = await context.Database.BeginTransactionAsync();
+        using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         try
         {
             fromAccount.Balance -= request.Amount;
@@ -110,5 +112,25 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
             _logger.LogError(ex, "Transfer failed");
             return ServiceResult<AccountResponseDto>.Failure($"Transfer failed: {ex.Message}", 500);
         }
+
+}
+        private static AsyncRetryPolicy CreateRetryPolicy(ILogger logger)
+    {
+        return Policy
+            .Handle<DbUpdateConcurrencyException>()
+            .Or<DbUpdateException>()
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: retryAttempt =>
+                    TimeSpan.FromMilliseconds(200 * retryAttempt),
+                onRetry: (exception, timeSpan, retryCount, context) =>
+                {
+                    logger.LogWarning(
+                        exception,
+                        "Retry {RetryCount} after {Delay}ms due to concurrency issue",
+                        retryCount,
+                        timeSpan.TotalMilliseconds
+                    );
+                });
     }
 }
