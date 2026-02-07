@@ -109,7 +109,6 @@ builder.Services.AddControllers();
 builder.Services.AddTransient<RequestTimingHandler>();
 
 var app = builder.Build();
-
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -125,6 +124,7 @@ app.UseMiddleware<RequestTimingHandler>();
 
 app.UseHttpsRedirection();
 
+app.UseRateLimiter(); //applly the rate limmter to the pipeLine
 app.UseAuthentication();
 app.UseAuthorization();
 
