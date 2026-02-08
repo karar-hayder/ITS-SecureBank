@@ -112,7 +112,7 @@ sequenceDiagram
     else Intent is Pending
         API->>API: Validate Ownership & Funds
         
-        rect rgb(200, 230, 255)
+        rect rgba(98, 224, 93, 0.5)
             Note right of API: Atomic Block
             API->>DB: Insert Ledger Entry (DEBIT Sender)
             API->>DB: Insert Ledger Entry (CREDIT Receiver)

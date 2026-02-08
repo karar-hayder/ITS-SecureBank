@@ -13,8 +13,8 @@ erDiagram
     Accounts ||--o{ Transactions : receives
     Accounts ||--o{ AccountApprovalRequests : associated_with
 
-    Accounts ||--o{ TransferIntents : from
-    TransferIntents }o--|| Accounts : to
+    Accounts ||--o{ TransferIntents : originates
+    Accounts ||--o{ TransferIntents : receives
 
     Users {
         int Id PK
@@ -22,7 +22,7 @@ erDiagram
         string Email
         string PhoneNumber
         string PasswordHash
-        int userRole
+        int UserRole
     }
 
     Accounts {
