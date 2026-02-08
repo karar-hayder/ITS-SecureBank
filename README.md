@@ -86,6 +86,15 @@ For deeper architectural details, refer to:
 
 ---
 
+## 👥 Core Team
+
+This project, This Backend was developed for the hackathon by:
+
+- **Karar Haider** - [@karar-hayder](https://github.com/karar-hayder)
+- **Ali Mohammed** - [@NOT-Ali0](https://github.com/NOT-Ali0)
+
+---
+
 ## 🛡️ Core Banking Invariants
 
 1. **Money Conservation**: Transfers have a net-zero effect.

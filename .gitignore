@@ -63,7 +63,5 @@ nunit-*.xml
 
 API/uploads/ids/*
 .devdbrc
-.gitignore
-requirements.txt
 test*.log
 idemtest.py
