@@ -49,70 +49,79 @@ sequenceDiagram
 
 SecureBank uses a **pure ledger-based system**. Every change in balance is driven by a ledger entry (Debit or Credit).
 
-### 2.1 Deposit Operation (Idempotent)
+### 2.1 Deposit Operation (Backend-Managed Idempotency)
+
+The backend handles idempotency for deposits using the `Idempotency-Key` header and a specialized filter.
 
 ```mermaid
 graph TD
-    A[Deposit Request] --> B{Idempotency Key Exists?}
-    B -- Yes --> C[Return Saved Response]
+    A[Deposit Request with Idempotency-Key] --> B{Filter: Key Exists for User?}
+    B -- Yes --> C[Return Cached Response from DB]
     B -- No --> D{Validate Amount > 0}
     D -- No --> E[Error: Invalid Amount]
     D -- Yes --> F[Begin Transaction]
     F --> G[Create CREDIT Transaction Entry]
     G --> H[Update Account Balance]
-    H --> I[Commit Transaction]
-    I --> J[Save Idempotency Response]
+    H --> I[Save Result to IdempotencyRecords]
+    I --> J[Commit Transaction]
     J --> K[Success]
 ```
 
-### 2.2 Withdrawal Operation (Idempotent)
+### 2.2 Withdrawal Operation (Backend-Managed Idempotency)
 
-Similar to Deposit, with sufficiency checks + Idempotency Guard.
+Similar to Deposit, the backend uses the `IdempotentAttribute` filter to guard against duplicate withdrawals while ensuring sufficiency checks are performed within the atomic block.
 
 ---
 
 ## 3. The Atomic Transfer Flow
 
-Transfers are the most critical operations. They must be atomic (all-or-nothing) and concurrency-safe.
+Transfers are the most critical operations. SecureBank uses **Intent-Based Idempotency** for transfers, managed entirely on the backend to ensure a robust two-phase completion.
 
 ### Operational Sequence
 
-1. **Idempotency Check**: Return cached result if key exists.
-2. **Authorization**: Verify the authenticated user owns the account associated with `fromAccountNumber`.
-3. **Discovery**: Find the `toAccount` using the unique `AccountNumber`.
-4. **Validation**: Check `amount > 0` and `fromAccount.Balance >= amount`.
-5. **Locking**: The database transaction ensures that the balance read for validation remains consistent during the update phase.
-6. **Execution** (Atomic Block):
+1. **Initiate (Intent)**: The client requests to start a transfer. The backend creates a `TransferIntent` in `Pending` state and returns a unique `TransferIntentId`. This ID serves as the idempotency anchor.
+2. **Complete (Two-Phase Completion)**: The client sends the `TransferIntentId` and `Amount` to the completion endpoint.
+3. **Backend Validation**: The backend verifies:
+    * The intent exists and is still `Pending`.
+    * The authenticated user owns the source account.
+    * Sufficient funds are available.
+4. **Execution (Atomic Block)**:
     * **Debit Sender**: Create a `Debit` transaction for Account A.
     * **Credit Receiver**: Create a `Credit` transaction for Account B.
-    * **Link**: Both transactions share the same `ReferenceId`.
-    * **Snapshot**: Record `BalanceAfter` on both ledger entries.
-7. **Concurrency Resolution**: If another request modified the balance in the same millisecond, the `RowVersion` check will trigger a rollback, preventing a "Double Spend".
+    * **Status Update**: Mark `TransferIntent` as `Completed`.
+    * **Optimistic Locking**: Uses `RowVersion` to prevent double-spending during race conditions.
+5. **Idempotency Guarantee**: If the completion request is replayed, the backend sees the intent status as `Completed` and returns the previous success without re-executing the money movement.
 
 ```mermaid
 sequenceDiagram
+    participant User
     participant API
     participant DB
     
-    API->>DB: Check Idempotency Key
-    alt Key Exists
-        DB-->>API: Return Cached Response
-    else New Request
-        API->>DB: Begin Transaction (Serializable/Snapshot)
-        API->>DB: Get both Accounts (With Concurrency Tokens)
-        API->>API: Validate Funds & Ownership
+    User->>API: POST /transfer/intent (From, To)
+    API->>DB: Create TransferIntent (Pending)
+    DB-->>API: TransferIntentId
+    API->>User: 200 OK (TransferIntentId)
+
+    User->>API: POST /transfer/complete (TransferIntentId, Amount)
+    API->>DB: Begin Transaction (Serializable)
+    API->>DB: Get Intent & Accounts (With Concurrency Tokens)
+    
+    alt Intent is already Completed
+        API->>User: Return Previous Success Result
+    else Intent is Pending
+        API->>API: Validate Ownership & Funds
         
         rect rgb(200, 230, 255)
             Note right of API: Atomic Block
-            API->>DB: Insert Ledger Entry (DEBIT from SENDER)
-            API->>DB: Insert Ledger Entry (CREDIT to RECEIVER)
-            API->>DB: Update Sender Balance (Checks RowVersion)
-            API->>DB: Update Receiver Balance (Checks RowVersion)
+            API->>DB: Insert Ledger Entry (DEBIT Sender)
+            API->>DB: Insert Ledger Entry (CREDIT Receiver)
+            API->>DB: Update Balances (Check RowVersion)
+            API->>DB: Update TransferIntent Status -> Completed
         end
         
-        API->>DB: Save Idempotency Record
         API->>DB: Commit
-        Note over API,DB: Success: Money moved across the ledger
+        API->>User: 200 OK (Success)
     end
 ```
 
@@ -125,8 +134,8 @@ sequenceDiagram
 | **RowVersion** | Prevents race conditions where two simultaneous $100 transfers from a $100 balance could both succeed. |
 | **Atomic Transactions** | Ensures that it is impossible for money to leave the sender without arriving at the receiver. |
 | **Immutable Ledger** | Transactions are append-only. No one (not even an admin) can "edit" history; they must file a corrective transaction. |
+| **Backend Idempotency** | Prevents duplicate processing via `IdempotencyRecords` (Filter) or `TransferIntents` (Logic). |
 | **ReferenceId** | Enables full auditability by linking the source and destination side of every movement. |
-| **Idempotency Keys** | Prevents duplicate processing of the same request due to network retries. |
 
 ---
 

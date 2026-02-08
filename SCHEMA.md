@@ -33,6 +33,7 @@ erDiagram
         int UserId FK
         int Status
         int Level
+        varbinary RowVersion
     }
 
     Transactions {
@@ -82,6 +83,9 @@ erDiagram
         string Key
         int UserId
         string Path
+        string Method
+        int ResponseStatusCode
+        string ResponseBody
     }
 ```
 
@@ -90,6 +94,7 @@ erDiagram
 ## Tables
 
 ### Users
+
 Stores user account information for authentication and profile management.
 
 | Column | Type | Constraints | Description |
@@ -110,6 +115,7 @@ Stores user account information for authentication and profile management.
 ---
 
 ### Accounts
+
 Stores banking account information associated with users.
 
 | Column | Type | Constraints | Description |
@@ -132,6 +138,7 @@ Stores banking account information associated with users.
 ---
 
 ### Transactions
+
 Stores all financial movements (deposits, withdrawals, transfers).
 
 | Column | Type | Constraints | Description |
@@ -141,7 +148,7 @@ Stores all financial movements (deposits, withdrawals, transfers).
 | **Amount** | DECIMAL(18,2) | NOT NULL | Movement amount |
 | **AccountId** | INT | FK (Accounts.Id) | Main account for transaction |
 | **BalanceAfter** | DECIMAL(18,2) | NOT NULL | Balance after transaction |
-| **RelatedAccountId**| INT | FK (Accounts.Id), NULL | Source/Dest account for transfers |
+| **RelatedAccountId** | INT | FK (Accounts.Id), NULL | Source/Dest account for transfers |
 | **ReferenceId** | NVARCHAR(50) | NOT NULL, INDEX | External/System reference |
 | **ReferenceNumber** | NVARCHAR(50) | UNIQUE, INDEX | Unique reference for the transaction |
 | **Description** | NVARCHAR(250) | NULL | Optional description |
@@ -155,7 +162,8 @@ Stores all financial movements (deposits, withdrawals, transfers).
 ---
 
 ### TransferIntents
-Tracks the progress of a multi-step transfer operation.
+
+Tracks the progress of a multi-step transfer operation. Used for intent-based idempotency.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
@@ -175,6 +183,7 @@ Tracks the progress of a multi-step transfer operation.
 ---
 
 ### AccountApprovalRequests
+
 Stores KYC/Account approval requests by users.
 
 | Column | Type | Constraints | Description |
@@ -182,11 +191,11 @@ Stores KYC/Account approval requests by users.
 | **Id** | INT | PK, AI | Primary Key |
 | **AccountId** | INT | FK (Accounts.Id) | Account to approve |
 | **UserId** | INT | FK (Users.Id) | User requesting |
-| **IdDocumentUrl** | NVARCHAR(MAX)| NOT NULL | Link to ID document |
+| **IdDocumentUrl** | NVARCHAR(MAX) | NOT NULL | Link to ID document |
 | **IsApproved** | BIT | NOT NULL | Approval status |
 | **ProcessedAt** | DATETIME2 | NULL | Processing timestamp |
-| **ProcessedByAdminId**| INT | NULL | Admin who processed request |
-| **AdminRemarks** | NVARCHAR(MAX)| NULL | Admin notes |
+| **ProcessedByAdminId** | INT | NULL | Admin who processed request |
+| **AdminRemarks** | NVARCHAR(MAX) | NULL | Admin notes |
 | **CreatedAt** | DATETIME2 | NOT NULL | Creation timestamp |
 | **UpdatedAt** | DATETIME2 | NULL | Last update timestamp |
 | **CreatedBy** | INT | NULL | ID of creator |
@@ -197,6 +206,7 @@ Stores KYC/Account approval requests by users.
 ---
 
 ### AuditLogs
+
 Stores change history for major entities.
 
 | Column | Type | Constraints | Description |
@@ -212,6 +222,7 @@ Stores change history for major entities.
 ---
 
 ### RefreshTokens
+
 Stores JWT refresh tokens for persistent sessions.
 
 | Column | Type | Constraints | Description |
@@ -225,31 +236,35 @@ Stores JWT refresh tokens for persistent sessions.
 ---
 
 ### IdempotencyRecords
-Used to prevent duplicate processing of API requests.
+
+Used for filter-based idempotency (Deposits/Withdrawals) to prevent duplicate processing.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | **Id** | INT | PK, AI | Primary Key |
-| **Key** | NVARCHAR(100) | NOT NULL | Idempotency Key |
+| **Key** | NVARCHAR(100) | NOT NULL | Idempotency Key (from Header) |
 | **UserId** | INT | NOT NULL | User who sent the request |
-| **Path** | NVARCHAR(MAX)| NOT NULL | API endpoint |
-| **Method** | NVARCHAR(MAX)| NOT NULL | HTTP Method |
-| **ResponseStatusCode**| INT | NOT NULL | Cached status code |
-| **ResponseBody** | NVARCHAR(MAX)| NULL | Cached response body |
+| **Path** | NVARCHAR(MAX) | NOT NULL | API endpoint |
+| **Method** | NVARCHAR(10) | NOT NULL | HTTP Method (POST, etc.) |
+| **ResponseStatusCode** | INT | NOT NULL | Cached status code |
+| **ResponseBody** | NVARCHAR(MAX) | NULL | Cached JSON response body |
 
 ---
 
 ## Enums
 
 ### UserRole
+
 - `Admin = 1`
 - `User = 2`
 
 ### AccountType
+
 - `Checking = 1`
 - `Savings = 2`
 
 ### AccountStatus
+
 - `Pending = 0`
 - `Active = 1`
 - `Inactive = 2`
@@ -257,16 +272,19 @@ Used to prevent duplicate processing of API requests.
 - `Closed = 4`
 
 ### AccountLevel
+
 - `Level1 = 1`
 - `Level2 = 2`
 - `Level3 = 3`
 
 ### TransactionType
+
 - `Debit = 1`
 - `Credit = 2`
 - `Transfer = 3`
 
 ### TransferIntentStatus
+
 - `Pending = 0`
 - `Completed = 1`
 - `Cancelled = 2`
