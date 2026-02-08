@@ -24,6 +24,7 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
         var fromAccount = await context.Accounts
             .FirstOrDefaultAsync(a => a.AccountNumber == fromAccountNumber);
 
+        
         if (fromAccount == null)
             return ServiceResult<string>.Failure("Source account not found.", 404);
 
@@ -72,30 +73,22 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
             if (transferIntent == null)
                 return ServiceResult<AccountResponseDto>.Failure("Transfer intent not found.", 404);
 
-            if (transferIntent.Status != TransferIntentStatus.Pending)
-                return ServiceResult<AccountResponseDto>.Failure("Transfer intent already completed or invalid.", 400);
+            var transferIntentValidationResult = ValidateTransferIntent(transferIntent, userId);
+            if (!transferIntentValidationResult.Success)
+                return transferIntentValidationResult;
 
             var fromAccount = transferIntent.FromAccount;
             var toAccount = transferIntent.ToAccount;
 
             if (fromAccount == null)
-                return ServiceResult<AccountResponseDto>.Failure("Source account for transfer intent not found.", 404);
+                return ServiceResult<AccountResponseDto>.Failure("Source account not found.", 404);
 
             if (toAccount == null)
-                return ServiceResult<AccountResponseDto>.Failure("Destination account for transfer intent not found.", 404);
+                return ServiceResult<AccountResponseDto>.Failure("Destination account not found.", 404);
 
-            if (fromAccount.UserId != userId)
-                return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to source account.", 403);
-
-            if (fromAccount.Status != AccountStatus.Active)
-                return ServiceResult<AccountResponseDto>.Failure("Source account is not active.", 400);
-
-            if (toAccount.Status != AccountStatus.Active)
-                return ServiceResult<AccountResponseDto>.Failure("Destination account is not active.", 400);
-
-            if (fromAccount.Balance < amount)
-                return ServiceResult<AccountResponseDto>.Failure("Insufficient funds.", 400);
-
+            var transferValidationResult = ValidateTransfer(transferIntent, amount);
+            if (!transferValidationResult.Success)
+                return transferValidationResult;
 
             using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             try
@@ -137,7 +130,7 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
                 context.Accounts.Update(fromAccount);
                 context.Accounts.Update(toAccount);
 
-                CompleteTransferIntent(context, transferIntent);
+                SetTransferIntentStatus(context, transferIntent, TransferIntentStatus.Completed);
 
                 await context.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -156,7 +149,7 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
             {
                 await transaction.RollbackAsync();
                 _logger.LogError(ex, "Transfer failed");
-                FailTransferIntent(context, transferIntent);
+                SetTransferIntentStatus(context, transferIntent!, TransferIntentStatus.Failed);
                 return ServiceResult<AccountResponseDto>.Failure($"Transfer failed: {ex.Message}", 500);
             }
         });
@@ -164,7 +157,6 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
 
     public async Task<ServiceResult<AccountResponseDto>> CancelTransferAsync(string intentId, int userId)
     {
-
         return await _retryPolicy.ExecuteAsync(async () =>
         {
             var transferIntent = await context.TransferIntents
@@ -175,24 +167,20 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
             if (transferIntent == null)
                 return ServiceResult<AccountResponseDto>.Failure("Transfer intent not found.", 404);
 
-            if (transferIntent.Status != TransferIntentStatus.Pending)
-                return ServiceResult<AccountResponseDto>.Failure("Transfer intent is not pending.", 400);
-
-            if (transferIntent.FromAccount == null)
-                return ServiceResult<AccountResponseDto>.Failure("Source account not found.", 404);
-
-            if (transferIntent.FromAccount.UserId != userId)
-                return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to source account.", 403);
+            var transferIntentValidationResult = ValidateTransferIntent(transferIntent, userId);
+            if (!transferIntentValidationResult.Success)
+                return transferIntentValidationResult;
 
             using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             try
             {
-                transferIntent.Status = TransferIntentStatus.Cancelled;
-                transferIntent.CompletedAt = DateTime.UtcNow;
-                context.TransferIntents.Update(transferIntent);
+                SetTransferIntentStatus(context, transferIntent, TransferIntentStatus.Cancelled);
 
                 await context.SaveChangesAsync();
                 await transaction.CommitAsync();
+
+                if (transferIntent.FromAccount == null)
+                    return ServiceResult<AccountResponseDto>.Failure("Source account not found.", 404);
 
                 return ServiceResult<AccountResponseDto>.SuccessResult(
                     transferIntent.FromAccount.Adapt<AccountResponseDto>(),
@@ -245,24 +233,66 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
                 });
     }
 
-    private static void CompleteTransferIntent(IBankDbContext context, TransferIntents transferIntent)
+    private static void SetTransferIntentStatus(IBankDbContext context, TransferIntents transferIntent, TransferIntentStatus status)
     {
-        
-        transferIntent.Status = TransferIntentStatus.Completed;
-        transferIntent.CompletedAt = DateTime.UtcNow;
-        context.TransferIntents.Update(transferIntent);
-    }
-    private static void FailTransferIntent(IBankDbContext context, TransferIntents transferIntent)
-    {
-        transferIntent.Status = TransferIntentStatus.Failed;
+        transferIntent.Status = status;
         transferIntent.CompletedAt = DateTime.UtcNow;
         context.TransferIntents.Update(transferIntent);
     }
 
-    private static void CancelTransferIntent(IBankDbContext context, TransferIntents transferIntent)
+    private static ServiceResult<AccountResponseDto> ValidateTransferIntent(TransferIntents? transferIntent, int userId)
     {
-        transferIntent.Status = TransferIntentStatus.Cancelled;
-        transferIntent.CompletedAt = DateTime.UtcNow;
-        context.TransferIntents.Update(transferIntent);
+        if (transferIntent == null)
+            return ServiceResult<AccountResponseDto>.Failure("Transfer intent not found.", 404);
+
+        if (transferIntent.Status != TransferIntentStatus.Pending)
+            return ServiceResult<AccountResponseDto>.Failure("Transfer intent is not pending.", 400);
+
+        if (transferIntent.FromAccount == null)
+            return ServiceResult<AccountResponseDto>.Failure("Source account not found.", 404);
+
+        if (transferIntent.FromAccount.UserId != userId)
+            return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to source account.", 403);
+
+        if (transferIntent.ToAccount == null)
+            return ServiceResult<AccountResponseDto>.Failure("Destination account not found.", 404);
+
+        if (transferIntent.FromAccount.Status != AccountStatus.Active)
+            return ServiceResult<AccountResponseDto>.Failure("Source account is not active.", 400);
+        if (transferIntent.ToAccount.Status != AccountStatus.Active)
+            return ServiceResult<AccountResponseDto>.Failure("Destination account is not active.", 400);
+        if (transferIntent.FromAccount.Id == transferIntent.ToAccount.Id)
+            return ServiceResult<AccountResponseDto>.Failure("Source and destination accounts cannot be the same.", 400);
+        // if (transferIntent.FromAccount.Currency != transferIntent.ToAccount.Currency)
+        //     return ServiceResult<AccountResponseDto>.Failure("Source and destination accounts must have the same currency.", 400); 
+        // For Future Implementation of Money Data Type
+
+        return ServiceResult<AccountResponseDto>.SuccessResult(transferIntent.FromAccount.Adapt<AccountResponseDto>(), "Transfer intent validated successfully.");
+    }
+
+    private static ServiceResult<AccountResponseDto> ValidateTransfer(TransferIntents transferIntent, decimal amount)
+    {
+        if (transferIntent.FromAccount == null)
+            return ServiceResult<AccountResponseDto>.Failure("Source account not found.", 404);
+
+        if (transferIntent.ToAccount == null)
+            return ServiceResult<AccountResponseDto>.Failure("Destination account not found.", 404);
+
+        if (transferIntent.FromAccount.Balance < amount)
+            return ServiceResult<AccountResponseDto>.Failure("Insufficient funds.", 400);
+
+        if (transferIntent.FromAccount.Id == transferIntent.ToAccount.Id)
+            return ServiceResult<AccountResponseDto>.Failure("Source and destination accounts cannot be the same.", 400);
+
+        if (amount <= 0)
+            return ServiceResult<AccountResponseDto>.Failure("Amount must be greater than 0.", 400);
+
+        if (transferIntent.FromAccount.Status != AccountStatus.Active)
+            return ServiceResult<AccountResponseDto>.Failure("Source account is not active.", 400);
+
+        if (transferIntent.ToAccount.Status != AccountStatus.Active)
+            return ServiceResult<AccountResponseDto>.Failure("Destination account is not active.", 400);
+
+        return ServiceResult<AccountResponseDto>.SuccessResult(transferIntent.FromAccount.Adapt<AccountResponseDto>(), "Transfer validated successfully.");
     }
 }
