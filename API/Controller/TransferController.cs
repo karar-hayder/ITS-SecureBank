@@ -50,6 +50,25 @@ public class TransferController(ITransferService transferService) : BaseControll
         return Ok(result.Data);
     }
 
+    [HttpPost("cancel")]
+    public async Task<IActionResult> CancelTransfer([FromBody] CancelTransferIntentDto request)
+    {
+        var userId = GetUserIdFromClaims();
+        if (userId == null)
+        {
+            return Unauthorized("User not authenticated.");
+        }
+
+        var result = await transferService.CancelTransferAsync(request.TransferIntentId, userId.Value);
+
+        if (!result.Success)
+        {
+            return StatusCode(result.StatusCode, new { message = result.Message });
+        }
+
+        return Ok(result.Data);
+    }
+
     private int? GetUserIdFromClaims()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

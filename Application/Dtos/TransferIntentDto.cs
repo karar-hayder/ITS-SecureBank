@@ -24,3 +24,9 @@ public class CompleteTransferDto
     public decimal Amount { get; set; }
     public string Description { get; set; } = default!;
 }
+
+public class CancelTransferIntentDto
+{
+    public string TransferIntentId { get; set; } = default!;
+}
+

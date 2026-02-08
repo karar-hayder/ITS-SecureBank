@@ -17,6 +17,8 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
 {
     private readonly ILogger<TransferService> _logger = logger;
 
+    private readonly AsyncRetryPolicy<ServiceResult<AccountResponseDto>> _retryPolicy = CreateRetryPolicy(logger);
+
     public async Task<ServiceResult<string>> InitiateTransferAsync(string fromAccountNumber, string toAccountNumber, int userId)
     {
         var fromAccount = await context.Accounts
@@ -60,122 +62,207 @@ public class TransferService(IBankDbContext context, ILogger<TransferService> lo
 
     public async Task<ServiceResult<AccountResponseDto>> CompleteTransferAsync(string intentId, decimal amount, string description, int userId)
     {
-        var transferIntent = await context.TransferIntents
-            .Include(x => x.FromAccount)
-            .Include(x => x.ToAccount)
-            .FirstOrDefaultAsync(x => x.TransferIntentId == intentId);
-
-        if (transferIntent == null)
-            return ServiceResult<AccountResponseDto>.Failure("Transfer intent not found.", 404);
-
-        if (transferIntent.Status != TransferIntentStatus.Pending)
-            return ServiceResult<AccountResponseDto>.Failure("Transfer intent already completed or invalid.", 400);
-
-        // Add null checks for fromAccount and toAccount and return error if either is null
-        var fromAccount = transferIntent.FromAccount;
-        var toAccount = transferIntent.ToAccount;
-
-        if (fromAccount == null)
-            return ServiceResult<AccountResponseDto>.Failure("Source account for transfer intent not found.", 404);
-
-        if (toAccount == null)
-            return ServiceResult<AccountResponseDto>.Failure("Destination account for transfer intent not found.", 404);
-
-        if (fromAccount.UserId != userId)
-            return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to source account.", 403);
-
-        if (fromAccount.Status != AccountStatus.Active)
-            return ServiceResult<AccountResponseDto>.Failure("Source account is not active.", 400);
-
-        if (toAccount.Status != AccountStatus.Active)
-            return ServiceResult<AccountResponseDto>.Failure("Destination account is not active.", 400);
-
-        if (fromAccount.Balance < amount)
-            return ServiceResult<AccountResponseDto>.Failure("Insufficient funds.", 400);
-
-        using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        try
+        return await _retryPolicy.ExecuteAsync(async () =>
         {
-            fromAccount.Balance -= amount;
-            toAccount.Balance += amount;
+            var transferIntent = await context.TransferIntents
+                .Include(x => x.FromAccount)
+                .Include(x => x.ToAccount)
+                .FirstOrDefaultAsync(x => x.TransferIntentId == intentId);
 
-            var referenceId = Guid.NewGuid().ToString();
+            if (transferIntent == null)
+                return ServiceResult<AccountResponseDto>.Failure("Transfer intent not found.", 404);
 
-            var debitTransaction = new Transaction
+            if (transferIntent.Status != TransferIntentStatus.Pending)
+                return ServiceResult<AccountResponseDto>.Failure("Transfer intent already completed or invalid.", 400);
+
+            var fromAccount = transferIntent.FromAccount;
+            var toAccount = transferIntent.ToAccount;
+
+            if (fromAccount == null)
+                return ServiceResult<AccountResponseDto>.Failure("Source account for transfer intent not found.", 404);
+
+            if (toAccount == null)
+                return ServiceResult<AccountResponseDto>.Failure("Destination account for transfer intent not found.", 404);
+
+            if (fromAccount.UserId != userId)
+                return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to source account.", 403);
+
+            if (fromAccount.Status != AccountStatus.Active)
+                return ServiceResult<AccountResponseDto>.Failure("Source account is not active.", 400);
+
+            if (toAccount.Status != AccountStatus.Active)
+                return ServiceResult<AccountResponseDto>.Failure("Destination account is not active.", 400);
+
+            if (fromAccount.Balance < amount)
+                return ServiceResult<AccountResponseDto>.Failure("Insufficient funds.", 400);
+
+
+            using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            try
             {
-                Type = TransactionType.Transfer,
-                Amount = amount,
-                AccountId = fromAccount.Id,
-                RelatedAccountId = toAccount.Id,
-                BalanceAfter = fromAccount.Balance,
-                ReferenceId = referenceId,
-                Description = string.IsNullOrEmpty(description)
-                    ? $"Transfer to {toAccount.AccountNumber}"
-                    : $"Transfer to {toAccount.AccountNumber}: {description}"
-            };
+                fromAccount.Balance -= amount;
+                toAccount.Balance += amount;
 
-            var creditTransaction = new Transaction
+                var referenceId = Guid.NewGuid().ToString();
+
+                var debitTransaction = new Transaction
+                {
+                    Type = TransactionType.Transfer,
+                    Amount = amount,
+                    AccountId = fromAccount.Id,
+                    RelatedAccountId = toAccount.Id,
+                    BalanceAfter = fromAccount.Balance,
+                    ReferenceId = referenceId,
+                    Description = string.IsNullOrEmpty(description)
+                        ? $"Transfer to {toAccount.AccountNumber}"
+                        : $"Transfer to {toAccount.AccountNumber}: {description}"
+                };
+
+                var creditTransaction = new Transaction
+                {
+                    Type = TransactionType.Transfer,
+                    Amount = amount,
+                    AccountId = toAccount.Id,
+                    RelatedAccountId = fromAccount.Id,
+                    BalanceAfter = toAccount.Balance,
+                    ReferenceId = referenceId,
+                    Description = string.IsNullOrEmpty(description)
+                        ? $"Transfer from {fromAccount.AccountNumber}"
+                        : $"Transfer from {fromAccount.AccountNumber}: {description}"
+                };
+
+                context.Transactions.Add(debitTransaction);
+                context.Transactions.Add(creditTransaction);
+
+                context.Accounts.Update(fromAccount);
+                context.Accounts.Update(toAccount);
+
+                CompleteTransferIntent(context, transferIntent);
+
+                await context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return ServiceResult<AccountResponseDto>.SuccessResult(
+                    fromAccount.Adapt<AccountResponseDto>(),
+                    "Transfer successful.");
+            }
+            catch (DbUpdateConcurrencyException)
             {
-                Type = TransactionType.Transfer,
-                Amount = amount,
-                AccountId = toAccount.Id,
-                RelatedAccountId = fromAccount.Id,
-                BalanceAfter = toAccount.Balance,
-                ReferenceId = referenceId,
-                Description = string.IsNullOrEmpty(description)
-                    ? $"Transfer from {fromAccount.AccountNumber}"
-                    : $"Transfer from {fromAccount.AccountNumber}: {description}"
-            };
-
-            context.Transactions.Add(debitTransaction);
-            context.Transactions.Add(creditTransaction);
-
-            context.Accounts.Update(fromAccount);
-            context.Accounts.Update(toAccount);
-
-            // Mark as complete to ensure idempotency
-            transferIntent.Status = TransferIntentStatus.Completed;
-            transferIntent.Amount = amount;
-            transferIntent.CompletedAt = DateTime.UtcNow;
-            context.TransferIntents.Update(transferIntent);
-
-            await context.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return ServiceResult<AccountResponseDto>.SuccessResult(
-                fromAccount.Adapt<AccountResponseDto>(),
-                "Transfer successful.");
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            await transaction.RollbackAsync();
-            return ServiceResult<AccountResponseDto>.Failure("Concurrency conflict during transfer. Please try again.", 409);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Transfer failed");
-            return ServiceResult<AccountResponseDto>.Failure($"Transfer failed: {ex.Message}", 500);
-        }
+                await transaction.RollbackAsync();
+                _logger.LogWarning("Transfer failed due to concurrency issue");
+                throw new Exception("Transfer failed due to concurrency issue"); // Let the retry policy handle this
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Transfer failed");
+                FailTransferIntent(context, transferIntent);
+                return ServiceResult<AccountResponseDto>.Failure($"Transfer failed: {ex.Message}", 500);
+            }
+        });
     }
 
-    private static AsyncRetryPolicy CreateRetryPolicy(ILogger logger)
+    public async Task<ServiceResult<AccountResponseDto>> CancelTransferAsync(string intentId, int userId)
     {
-        return Policy
+
+        return await _retryPolicy.ExecuteAsync(async () =>
+        {
+            var transferIntent = await context.TransferIntents
+                .Include(t => t.FromAccount)
+                .Include(t => t.ToAccount)
+                .FirstOrDefaultAsync(t => t.TransferIntentId == intentId);
+
+            if (transferIntent == null)
+                return ServiceResult<AccountResponseDto>.Failure("Transfer intent not found.", 404);
+
+            if (transferIntent.Status != TransferIntentStatus.Pending)
+                return ServiceResult<AccountResponseDto>.Failure("Transfer intent is not pending.", 400);
+
+            if (transferIntent.FromAccount == null)
+                return ServiceResult<AccountResponseDto>.Failure("Source account not found.", 404);
+
+            if (transferIntent.FromAccount.UserId != userId)
+                return ServiceResult<AccountResponseDto>.Failure("Unauthorized access to source account.", 403);
+
+            using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            try
+            {
+                transferIntent.Status = TransferIntentStatus.Cancelled;
+                transferIntent.CompletedAt = DateTime.UtcNow;
+                context.TransferIntents.Update(transferIntent);
+
+                await context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return ServiceResult<AccountResponseDto>.SuccessResult(
+                    transferIntent.FromAccount.Adapt<AccountResponseDto>(),
+                    "Transfer cancelled successfully.");
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogWarning("Transfer cancellation failed due to concurrency issue");
+                throw new Exception("Transfer cancellation failed due to concurrency issue"); // Let the retry policy handle this
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Transfer cancellation failed");
+                return ServiceResult<AccountResponseDto>.Failure($"Transfer cancellation failed: {ex.Message}", 500);
+            }
+        });
+    }
+
+    private static AsyncRetryPolicy<ServiceResult<AccountResponseDto>> CreateRetryPolicy(ILogger logger)
+    {
+        return Policy<ServiceResult<AccountResponseDto>>
             .Handle<DbUpdateConcurrencyException>()
             .Or<DbUpdateException>()
+            .OrResult(r => r?.StatusCode == 409)
             .WaitAndRetryAsync(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt =>
                     TimeSpan.FromMilliseconds(200 * retryAttempt),
-                onRetry: (exception, timeSpan, retryCount, context) =>
+                onRetry: (outcome, timeSpan, retryCount, context) =>
                 {
-                    logger.LogWarning(
-                        exception,
-                        "Retry {RetryCount} after {Delay}ms due to concurrency issue",
-                        retryCount,
-                        timeSpan.TotalMilliseconds
-                    );
+                    if (outcome.Exception is Exception ex)
+                    {
+                        logger.LogWarning(
+                            ex,
+                            "Retry {RetryCount} after {Delay}ms due to concurrency issue",
+                            retryCount,
+                            timeSpan.TotalMilliseconds
+                        );
+                    }
+                    else
+                    {
+                        logger.LogWarning(
+                            "Retry {RetryCount} after {Delay}ms due to concurrency issue",
+                            retryCount,
+                            timeSpan.TotalMilliseconds
+                        );
+                    }
                 });
+    }
+
+    private static void CompleteTransferIntent(IBankDbContext context, TransferIntents transferIntent)
+    {
+        
+        transferIntent.Status = TransferIntentStatus.Completed;
+        transferIntent.CompletedAt = DateTime.UtcNow;
+        context.TransferIntents.Update(transferIntent);
+    }
+    private static void FailTransferIntent(IBankDbContext context, TransferIntents transferIntent)
+    {
+        transferIntent.Status = TransferIntentStatus.Failed;
+        transferIntent.CompletedAt = DateTime.UtcNow;
+        context.TransferIntents.Update(transferIntent);
+    }
+
+    private static void CancelTransferIntent(IBankDbContext context, TransferIntents transferIntent)
+    {
+        transferIntent.Status = TransferIntentStatus.Cancelled;
+        transferIntent.CompletedAt = DateTime.UtcNow;
+        context.TransferIntents.Update(transferIntent);
     }
 }
